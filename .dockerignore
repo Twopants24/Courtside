@@ -1,0 +1,10 @@
+node_modules
+.git
+.env
+.env.*
+*.log
+*.pid
+.DS_Store
+work
+.playwright-cli
+*-qa.png

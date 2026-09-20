@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "three": "^0.186.0",
+    "ws": "^8.21.3"
+  },
+  "name": "courtside-dodgeball",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.mjs",
+    "single": "python3 -m http.server 8123"
+  }
+}
