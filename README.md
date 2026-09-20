@@ -68,7 +68,9 @@ The Node server runs the shared game rules in a worker per room at 120 Hz and se
 
 ## Hosting
 
-GitHub stores this source code; pushing it does not deploy a running game. GitHub Pages cannot run the Node multiplayer server.
+Single-player is published at https://twopants24.github.io/Courtside/ (capital C). Pages publishes the prebuilt `gh-pages` branch from its root. Build updated static assets with `npm ci` and `npm run build:pages`, then commit the contents of `dist/` to `gh-pages`. In Settings → Pages, choose **Deploy from a branch**, **gh-pages**, **/ (root)**. Changes to `main` alone do not republish the site. The generated `dist/` contains the root index and required Three.js modules; it excludes the Node server. Preview it with a static HTTP server if needed.
+
+GitHub Pages cannot run the Node multiplayer server. The Pages build displays a single-player notice in place of the online controls. `npm start` and Docker retain the complete multiplayer version. A separate long-running HTTPS/WebSocket host is required for public online duels; no multiplayer backend is configured for the Pages site.
 
 For temporary internet play, start the game with `npm start`, then run `cloudflared tunnel --url http://localhost:8124` after installing Cloudflare's `cloudflared` CLI. Share the HTTPS address printed by the tunnel, then use the game's invite links. This free Quick Tunnel needs no account, but its address changes on restart and it only works while the computer, game server, and tunnel remain running and connected. It is not durable hosting.
 

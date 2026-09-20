@@ -8,3 +8,4 @@ node_modules/
 work/
 .playwright-cli/
 *-qa.png
+dist/
