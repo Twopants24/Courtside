@@ -13,7 +13,7 @@ npm ci
 npm start
 ```
 
-Open [COURTSIDE locally](http://localhost:8124/?v=21) in a WebGL-capable browser. Keep the terminal running. Press Ctrl+C to stop the server. No build step, API keys, or accounts are needed for local play. The server listens on all network interfaces; localhost links only work on the computer running it.
+Open [COURTSIDE locally](http://localhost:8124/?v=22) in a WebGL-capable browser. Keep the terminal running. Press Ctrl+C to stop the server. No build step, API keys, or accounts are needed for local play. The server listens on all network interfaces; localhost links only work on the computer running it.
 
 ## Mobile touch controls (v20)
 
@@ -50,7 +50,7 @@ Toggle **Infinity Mode** before play or on the pause screen. The clock shows ∞
 
 ## Play
 
-Run `npm ci` once, then `npm start` in this folder and open http://localhost:8124/?v=21. Node.js 24 is recommended. This serves both the game and authoritative WebSocket match server. `PORT` overrides 8124. For single-player static serving only, `npm run single` uses Python 3 on port 8123. Requires a browser with WebGL and either a keyboard/mouse or a touchscreen. Fonts use an optional Google Fonts connection and fall back to system fonts offline.
+Run `npm ci` once, then `npm start` in this folder and open http://localhost:8124/?v=22. Node.js 24 is recommended. This serves both the game and authoritative WebSocket match server. `PORT` overrides 8124. For single-player static serving only, `npm run single` uses Python 3 on port 8123. Requires a browser with WebGL and either a keyboard/mouse or a touchscreen. Fonts use an optional Google Fonts connection and fall back to system fonts offline.
 
 - **WASD:** Move. Walk over a safe ball to pick it up.
 - **Mouse:** Aim at the court.
@@ -91,6 +91,6 @@ For persistent deployment, use a Node/container host that supports WebSockets an
 
 Verification: two independent WebSocket clients passed create/join, both-ready start, independent movement, authoritative hit/win, pause, token-based reconnect, and rematch through both localhost and the public WSS endpoint. Browser contexts passed invite entry, guest controls, refresh/rejoin, and return to restored single-player settings. Additional local checks cover an authoritative catch, rejecting client-submitted scores, and a full room.
 
-## Camera views (v21)
+## Camera views (v22)
 
-Third-person remains the default. Use **Camera** in match setup or the pause menu, or press **V**, to switch to first-person. The eye-height camera faces the opposing half and follows your position and jump. Aim within the view using the mouse, or use mobile auto aim / drag-to-aim. A white aiming ring and a small held-ball view keep shots readable without your own jersey blocking the view. Sidelined players temporarily use the overview camera; returning restores first-person. Camera selection persists through pauses, rounds, and stage changes.
+Third-person remains the default. Use **Camera** in match setup or the pause menu, or press **V**, to switch to first-person. The eye-height camera faces the opposing half and follows your position and jump. Aim within the view using the mouse, or use mobile auto aim / drag-to-aim. A white aiming ring and a small held-ball view keep shots readable without your own jersey blocking the view. Sidelined players keep an eye-level view from their side position, looking back across the court with a return countdown. Team-colored first-person arms show idle, held-ball, charging, throw, catch/block, jump, and dodge poses. Camera selection persists through pauses, rounds, and stage changes.
