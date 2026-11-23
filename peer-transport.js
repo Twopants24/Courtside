@@ -1,14 +1,17 @@
 import './node_modules/peerjs/dist/peerjs.min.js';
+const roomCode=()=>Array.from(crypto.getRandomValues(new Uint8Array(4)),n=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[n&31]).join('');
 // PeerJS Cloud only introduces peers. Match state and inputs use WebRTC data channels.
 export class DuelPeer {
  constructor(command){
-  this.readyState=0;this.host=command.type==='create';this.code=this.host?crypto.randomUUID().replaceAll('-','').slice(0,8).toUpperCase():command.code;
-  this.stage=command.stage||'gym';this.mode='waiting';this.ready=[false,false];this.guestToken=null;this.closed=false;
+  this.readyState=0;this.host=command.type==='create';this.code=this.host?roomCode():command.code;
+  this.stage=command.stage||'gym';this.mode='waiting';this.ready=[false,false];this.guestToken=null;this.closed=false;this.codeAttempts=0;this.openPeer();
+ }
+ openPeer(){
   this.peer=new window.Peer(this.host?'courtside-'+this.code:undefined,{debug:0,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'}]}});
   this.peer.on('open',()=>{this.readyState=1;this.onopen?.()});
   this.peer.on('connection',c=>this.accept(c));
   this.peer.on('disconnected',()=>{if(!this.closed)setTimeout(()=>{if(!this.closed&&this.peer.disconnected)this.peer.reconnect()},1000)});
-  this.peer.on('error',e=>{if(this.closed)return;if(this.conn?.open)return;this.emit({type:'error',message:e.type==='peer-unavailable'?'Host not found. Ask your friend to keep their room open and check the code.':'Could not connect the players. Try again on the same Wi-Fi; some networks block direct connections.'});this.close()});
+  this.peer.on('error',e=>{if(this.closed)return;if(this.host&&e.type==='unavailable-id'&&this.codeAttempts++<5){this.peer.removeAllListeners();this.peer.destroy();this.code=roomCode();this.openPeer();return}if(this.conn?.open)return;this.emit({type:'error',message:e.type==='peer-unavailable'?'Host not found. Ask your friend to keep their room open and check the code.':'Could not connect the players. Try again on the same Wi-Fi; some networks block direct connections.'});this.close()});
  }
  emit(m){if(!this.closed)this.onmessage?.({data:JSON.stringify(m)})}
  remote(m,c=this.conn){if(c?.open&&(!c.dataChannel||c.dataChannel.bufferedAmount<1000000))c.send(m)}
@@ -33,7 +36,7 @@ export class DuelPeer {
  }
  send(raw){if(this.closed)return;let m;try{m=JSON.parse(raw)}catch{return}
   if(m.type==='create'&&this.host){
-   this.worker=new Worker(new URL('./peer-simulation.js?v=25',import.meta.url),{type:'module'});
+   this.worker=new Worker(new URL('./peer-simulation.js?v=26',import.meta.url),{type:'module'});
    this.worker.onerror=()=>{this.remote({type:'ended',message:'The host simulation stopped.'});this.emit({type:'ended',message:'The match could not start. Refresh and create a new room.'});this.close()};
    this.worker.onmessage=e=>{const m=e.data;if(m.type!=='state')return;this.state=m.state;if(m.state.phase==='playing')this.starting=false;if(m.state.phase==='over'&&this.mode==='playing'&&!this.starting){this.mode='over';this.ready=[false,false];this.room()}this.emit(m);this.remote(m)};
    this.emit({type:'joined',code:this.code,team:0,token:crypto.randomUUID()});this.room();return;
