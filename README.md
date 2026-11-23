@@ -13,7 +13,20 @@ npm ci
 npm start
 ```
 
-Open [COURTSIDE locally](http://localhost:8124/?v=19) in a desktop browser. Keep the terminal running. Press Ctrl+C to stop the server. No build step, API keys, or accounts are needed for local play. The server listens on all network interfaces; localhost links only work on the computer running it.
+Open [COURTSIDE locally](http://localhost:8124/?v=20) in a WebGL-capable browser. Keep the terminal running. Press Ctrl+C to stop the server. No build step, API keys, or accounts are needed for local play. The server listens on all network interfaces; localhost links only work on the computer running it.
+
+## Mobile touch controls (v20)
+
+Phones and tablets with a coarse primary pointer and viewport up to 1400 CSS pixels wide show touch controls during play; desktop mouse layouts remain unchanged. Landscape gives the most court space, and portrait is supported.
+
+- **Left joystick:** drag to move; small movements walk more slowly. Release to stop.
+- **Aim:** automatically tracks the nearest live opponent. Touch/drag the court to select a manual aim point; tap **Manual · Reset** to return to auto aim.
+- **Throw:** hold to charge, keep holding for 3 seconds to overcharge, then release. Move or use another action while holding.
+- **Dash / Jump / Catch:** use the same existing cooldowns and rules. Catch becomes **Block** while holding a ball.
+- **Super:** arms an earned super shot. The button shows meter percentage and armed status.
+- **Pause and sound:** remain available at the top. Cancelled touches, losing focus, resizing, and pausing clear held movement and charging without firing an accidental shot.
+
+The Node version also accepts mobile analog input for private online duels. GitHub Pages remains single-player only.
 
 ## Stages
 
@@ -37,7 +50,7 @@ Toggle **Infinity Mode** before play or on the pause screen. The clock shows ∞
 
 ## Play
 
-Run `npm ci` once, then `npm start` in this folder and open http://localhost:8124/?v=19. Node.js 24 is recommended. This serves both the game and authoritative WebSocket match server. `PORT` overrides 8124. For single-player static serving only, `npm run single` uses Python 3 on port 8123. Requires a desktop browser with WebGL, a keyboard, and a mouse. Fonts use an optional Google Fonts connection and fall back to system fonts offline.
+Run `npm ci` once, then `npm start` in this folder and open http://localhost:8124/?v=20. Node.js 24 is recommended. This serves both the game and authoritative WebSocket match server. `PORT` overrides 8124. For single-player static serving only, `npm run single` uses Python 3 on port 8123. Requires a browser with WebGL and either a keyboard/mouse or a touchscreen. Fonts use an optional Google Fonts connection and fall back to system fonts offline.
 
 - **WASD:** Move. Walk over a safe ball to pick it up.
 - **Mouse:** Aim at the court.

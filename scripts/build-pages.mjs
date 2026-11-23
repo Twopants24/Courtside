@@ -2,7 +2,7 @@ import {mkdir,copyFile,cp,writeFile,rm} from 'node:fs/promises';
 const root=new URL('../',import.meta.url),out=new URL('dist/',root);
 await rm(out,{recursive:true,force:true});
 await mkdir(new URL('node_modules/three/build/',out),{recursive:true});
-for(const file of ['index.html','game.js','style.css'])await copyFile(new URL(file,root),new URL(file,out));
+for(const file of ['index.html','game.js','mobile.js','style.css'])await copyFile(new URL(file,root),new URL(file,out));
 await cp(new URL('stages/',root),new URL('stages/',out),{recursive:true});
 for(const file of ['three.module.js','three.core.js'])await copyFile(new URL('node_modules/three/build/'+file,root),new URL('node_modules/three/build/'+file,out));
 await copyFile(new URL('node_modules/three/LICENSE',root),new URL('node_modules/three/LICENSE',out));
