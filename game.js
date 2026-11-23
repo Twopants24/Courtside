@@ -534,33 +534,75 @@ for (const b of balls) {
 updateExplosions(dt);updateFire(dt);if(phase!=='playing')return;
 for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.life-=dt;p.m.position.addScaledVector(p.v,dt);p.v.y-=12*dt;p.m.scale.setScalar(Math.max(.01,p.life*2));if(p.life<=0){scene.remove(p.m);p.m.geometry.dispose();p.m.material.dispose();particles.splice(i,1)}}checkWin();msgTime-=dt;if(msgTime<=0)$('message').textContent='';$('timer').textContent=infinityMode?'∞':sudden?'NEXT OUT':`${Math.floor(Math.max(0,remaining)/60)}:${String(Math.floor(Math.max(0,remaining)%60)).padStart(2,'0')}`;sync();$('returnNotice').hidden=controlled.alive||phase!=='playing';$('returnNotice').textContent=`SIDELINED · BACK IN ${controlled.outTime.toFixed(1)}s`;$('ballStatus').textContent=!controlled.alive?'SIDELINED · SAME PLAYER RETURNS':controlled.protection>0?'RETURN SHIELD · '+controlled.protection.toFixed(1)+'s':controlled.ball?charging?'CHARGING SHOT':'BALL IN HAND · AIM & THROW':'WALK OVER A BALL TO PICK UP';$('charge').style.width=(charge*100)+'%';$('overcharge').style.width=(Math.max(0,(holdTime-1.1)/1.9)*100)+'%';$('overchargeLabel').textContent=controlled.ball?.flaming?'FIRE READY · RELEASE':holdTime>1.1?'OVERCHARGING · '+holdTime.toFixed(1)+' / 3s':'OVERCHARGE · HOLD 3s';$('jumpStatus').textContent=controlled.jumpY>.6?'AIRBORNE':controlled.jumpCd>0?controlled.jumpCd.toFixed(1)+'s':'READY';$('dodgeStatus').textContent=controlled.dodge>0?controlled.dodge.toFixed(1)+'s':'READY';$('defenseLabel').textContent=controlled.ball?'BLOCK':'CATCH';$('catchStatus').textContent=controlled.blockTime>0?'BLOCK!':controlled.catchTime>0?'CATCH!':controlled.catchCd>0?controlled.catchCd.toFixed(1)+'s':'READY';}
 const aimRing=new THREE.Mesh(new THREE.RingGeometry(.35,.43,32),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.85,side:THREE.DoubleSide}));aimRing.rotation.x=-Math.PI/2;scene.add(aimRing);const aimLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineDashedMaterial({color:0xffffff,transparent:true,opacity:.35,dashSize:.35,gapSize:.25}));scene.add(aimLine);
-function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}window.addEventListener('resize',resize);resize();
+function resize(){const width=document.documentElement?.clientWidth||innerWidth,height=document.documentElement?.clientHeight||innerHeight;renderer.setSize(width,height);camera.aspect=width/height;camera.updateProjectionMatrix()}window.addEventListener('resize',resize);resize();
 function pause(){if(networkReplica){window.dispatchEvent(new Event('online-pause'));return}if(phase==='playing'){phase='paused';for(const p of players){p.blockTime=0;p.catchTime=0}stopCrowdAudio();message('PAUSED · PRESS ESC OR RESUME',100);$('pause').innerHTML='▶ RESUME';$('pauseScreen').hidden=false;charging=false;charge=0;holdTime=0;controlled.superArmed=false;if(controlled.ball)extinguish(controlled.ball);keys={}}else if(phase==='paused'){phase='playing';$('pauseScreen').hidden=true;$('game').focus();message('BACK IN PLAY',1);$('pause').innerHTML='Ⅱ <span>PAUSE</span>'}}
 $('start').onclick=()=>{reset();keys={};phase='playing';$('game').focus();$('overlay').style.display='none';beep(650,.12);message('GAME ON · COLLECT A BALL',3)};$('pause').onclick=pause;$('resume').onclick=pause;$('sound').onclick=()=>{muted=!muted;if(muted)stopCrowdAudio();$('sound').textContent=muted?'SOUND OFF':'SOUND ON'};
 window.addEventListener('keydown',e=>{if(networkReplica)return;if(e.code!=='Escape'&&e.target.closest?.('button,select,input'))return;if(['Space','ShiftLeft','ShiftRight','KeyW','KeyA','KeyS','KeyD'].includes(e.code))e.preventDefault();if(e.code==='Escape'&&!e.repeat)pause();keys[e.code]=true;if(phase==='playing'&&!e.repeat){if(e.code==='Space')jump(controlled);if(e.code==='ShiftLeft'||e.code==='ShiftRight')dodge(controlled);if(e.code==='KeyE')catchBall(controlled);if(e.code==='KeyQ')armSuper(controlled)}});window.addEventListener('keyup',e=>{if(!networkReplica)keys[e.code]=false});window.addEventListener('blur',()=>{if(networkReplica)return;keys={};if(phase==='playing')pause()});window.addEventListener('mousemove',e=>{mouse.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1)});$('game').addEventListener('mousedown',e=>{if(networkReplica)return;if(e.button===0&&phase==='playing'&&controlled.ball){charging=true;charge=controlled.superArmed?1:0;holdTime=controlled.superArmed?3:0}});window.addEventListener('mouseup',e=>{if(networkReplica)return;if(e.button===0&&charging){if(phase==='playing')throwBall(controlled,charge,aim);charging=false;charge=0;holdTime=0}});window.addEventListener('contextmenu',e=>e.preventDefault());
 reset();camera.position.set(13,21,30);let accumulator=0;
 const viewBall=new THREE.Mesh(new THREE.SphereGeometry(.105,16,12),gold);viewBall.position.set(.28,-.23,-.62);viewBall.visible=false;camera.add(viewBall);scene.add(camera);
+// Camera-space arms are allocated once and rendered in a separate depth pass.
+const viewArms=new THREE.Group();camera.add(viewArms);
+const armUp=new THREE.Vector3(0,1,0),armDelta=new THREE.Vector3();
+const armModels=[-1,1].map(side=>{
+ const upper=new THREE.Mesh(new THREE.CylinderGeometry(.075,.085,1,8),jerseyMaterials[0].shirt);
+ const cuff=new THREE.Mesh(new THREE.CylinderGeometry(.079,.079,.045,8),jerseyMaterials[0].trim);
+ const forearm=new THREE.Mesh(new THREE.CylinderGeometry(.052,.068,1,8),skin);
+ const hand=new THREE.Mesh(new THREE.SphereGeometry(.067,10,8),skin);hand.scale.set(.85,1,1.25);
+ viewArms.add(upper,cuff,forearm,hand);
+ return {side,upper,cuff,forearm,hand,wrist:new THREE.Vector3(side*.29,-.3,-.7)};
+});
+viewArms.traverse(o=>o.layers.set(1));viewBall.layers.set(1);
+scene.traverse(o=>{if(o.isLight)o.layers.enable(1)});
+let armsPose='idle',viewHadBall=false,viewThrowTime=0,viewPlayer=null;
+function armSegment(mesh,a,b){armDelta.subVectors(b,a);mesh.position.copy(a).add(b).multiplyScalar(.5);mesh.scale.y=armDelta.length();mesh.quaternion.setFromUnitVectors(armUp,armDelta.normalize())}
+function updateViewArms(dt,visible,held){
+ viewArms.visible=visible;if(viewPlayer!==controlled){viewPlayer=controlled;viewHadBall=false;viewThrowTime=0}
+ if(phase==='playing'){viewThrowTime=Math.max(0,viewThrowTime-dt);if(viewHadBall&&!held&&controlled.alive)viewThrowTime=.24}
+ viewHadBall=!!held;
+ const power=Math.min(1,(networkReplica?controlled.netCharge||0:holdTime)/3),defend=controlled.blockTime>0||controlled.catchTime>0;
+ armsPose=!controlled.alive?'sideline':defend?(held?'block':'catch'):viewThrowTime>0?'throw':controlled.dash>0?'dodge':controlled.jumpY>.1?'jump':held?(power>0?'charge':'hold'):'idle';
+ if(!visible)return;
+ const narrow=Math.min(1,camera.aspect/.9),bob=controlled.alive?Math.sin(fireClock*5)*.008:0;
+ for(const a of armModels){
+  const side=a.side,right=side===1;
+  let x=side*.29,y=-.3+bob,z=-.7;
+  if(held){x=right?.24:-.22;y=right?-.27:-.33;z=right?-.72:-.68;if(right){x+=power*.08;y+=power*.12;z+=power*.13}}
+  if(defend){x=side*(held?.18:.13);y=-.08;z=-.78}
+  if(armsPose==='throw'&&right){x=.12;y=-.04;z=-.98}
+  if(armsPose==='jump')y+=.06;
+  if(armsPose==='dodge'){x*=.75;y-=.08}
+  if(!controlled.alive){y=-.36;z=-.68}
+  const target=new THREE.Vector3(x*narrow,y,z);a.wrist.lerp(target,1-Math.exp(-dt*24));
+  const shoulder=new THREE.Vector3(side*.43*narrow,-.64,-.36),elbow=new THREE.Vector3(side*.38*narrow,-.42+bob,-.53);
+  if(defend)elbow.y=-.31;
+  armSegment(a.upper,shoulder,elbow);armSegment(a.forearm,elbow,a.wrist);a.cuff.position.copy(elbow);a.cuff.quaternion.copy(a.upper.quaternion);a.hand.position.copy(a.wrist);
+  a.upper.material=jerseyMaterials[controlled.team].shirt;a.cuff.material=jerseyMaterials[controlled.team].trim;
+ }
+ viewBall.position.copy(armModels[1].wrist).add(new THREE.Vector3(0,.085,-.055));
+}
 function setCameraMode(value){firstPerson=value;cameraSnap=true;document.querySelectorAll('.camera-toggle').forEach(b=>{b.textContent=firstPerson?'CAMERA · FIRST PERSON':'CAMERA · THIRD PERSON';b.setAttribute('aria-pressed',String(firstPerson))});mouse.set(0,0);touchAim=null;touchAutoAim=true;}
 document.querySelectorAll('.camera-toggle').forEach(b=>b.addEventListener('click',()=>setCameraMode(!firstPerson)));
 window.addEventListener('keydown',e=>{if(e.code==='KeyV'&&!e.repeat&&!e.target.closest?.('input,select,textarea')){e.preventDefault();setCameraMode(!firstPerson)}});
 function aimFromView(target){ray.setFromCamera(mouse,camera);if(!ray.ray.intersectPlane(plane,target)||ray.ray.direction.y>=-.015||target.distanceTo(camera.position)>40){target.copy(camera.position).addScaledVector(ray.ray.direction,30);target.y=.9}target.x=clamp(target.x,-12,12);target.z=clamp(target.z,-16,16);return target}
 function frame(){requestAnimationFrame(frame);let dt=Math.min(clock.getDelta(),.05);accumulator+=dt;while(accumulator>=1/120){if(!networkReplica)update(1/120);accumulator-=1/120}
 if(networkReplica)for(const p of players){if(p.renderTarget)p.g.position.lerp(p.renderTarget,1-Math.exp(-dt*22))}
-let active=phase==='playing'||phase==='paused',eyeView=firstPerson&&active&&controlled.alive;
+let active=phase==='playing'||phase==='paused',eyeView=firstPerson&&(active||phase==='over');
 const fov=eyeView?80:52;if(camera.fov!==fov){camera.fov=fov;camera.near=eyeView?.04:.1;camera.updateProjectionMatrix()}
-if(eyeView){const body=controlled.g.position,forward=controlled.team?1:-1;camera.position.set(body.x,body.y+1.65,body.z);camera.lookAt(body.x,body.y+1.65-2,body.z+forward*15)}else{let dest=active?new THREE.Vector3(controlled.alive?controlled.x*.35:0,18,controlled.alive?controlled.z+(controlled.team?-19:19):(controlled.team?-28:28)):new THREE.Vector3(13,21,30);if(cameraWasEye||cameraSnap)camera.position.copy(dest);else camera.position.lerp(dest,1-Math.exp(-dt*3));camera.lookAt(active&&controlled.alive?controlled.x*.2:0,0,active&&controlled.alive?controlled.z+(controlled.team?8:-8):0)}
-cameraWasEye=eyeView;cameraSnap=false;
+if(eyeView){const body=controlled.g.position,forward=controlled.team?1:-1;camera.position.set(body.x,body.y+1.65,body.z);if(controlled.alive)camera.lookAt(body.x,body.y+1.65-2,body.z+forward*15);else camera.lookAt(0,1.2,body.z*.25)}else{let dest=active?new THREE.Vector3(controlled.alive?controlled.x*.35:0,18,controlled.alive?controlled.z+(controlled.team?-19:19):(controlled.team?-28:28)):new THREE.Vector3(13,21,30);if(cameraWasEye||cameraSnap)camera.position.copy(dest);else camera.position.lerp(dest,1-Math.exp(-dt*3));camera.lookAt(active&&controlled.alive?controlled.x*.2:0,0,active&&controlled.alive?controlled.z+(controlled.team?8:-8):0)}
+cameraWasEye=eyeView;cameraSnap=false;document.body?.classList.toggle('first-person-view',eyeView);
 aimFromView(aim);if(touchEnabled){if(touchAutoAim){const target=players.filter(p=>p.alive&&p.team!==controlled.team).sort((a,b)=>Math.hypot(a.x-controlled.x,a.z-controlled.z)-Math.hypot(b.x-controlled.x,b.z-controlled.z))[0];aim.set(target?.x??0,0,target?.z??(controlled.team?9:-9))}else if(touchAim)aim.copy(touchAim)}aim.x=clamp(aim.x,-12,12);aim.z=clamp(aim.z,-16,16);aimRing.position.set(aim.x,.06,aim.z);aimRing.visible=active&&controlled.alive;aimLine.visible=active&&!!controlled.ball;if(aimLine.visible){aimLine.geometry.setFromPoints([new THREE.Vector3(controlled.x,.08,controlled.z),new THREE.Vector3(aim.x,.08,aim.z)]);aimLine.computeLineDistances()}if(networkReplica){
   if(phase==='playing'){fireClock+=dt;updateExplosions(dt)}
 }
 animateCrowd(dt);drawFire();
 const held=controlled.ball,bodyVisible=controlled.g.visible,ballVisible=held?.mesh.visible,flameVisible=held?.flame.visible;
+updateViewArms(dt,eyeView,held);
 viewBall.visible=eyeView&&!!held;if(viewBall.visible){viewBall.material=held.flaming?(held.superShot||controlled.superArmed?blueFireMaterial:fireMaterial):gold;viewBall.rotation.y+=dt*2}
 if(eyeView){controlled.g.visible=false;if(held){held.mesh.visible=false;held.flame.visible=false}}
-const reticle=$('firstPersonAim');if(reticle){reticle.hidden=!eyeView;const screen=aim.clone();screen.y=.9;screen.project(camera);reticle.style.left=((screen.x+1)*50)+'%';reticle.style.top=((1-screen.y)*50)+'%'}
-renderer.render(scene,camera);controlled.g.visible=bodyVisible;if(held){held.mesh.visible=ballVisible;held.flame.visible=flameVisible}}frame();
+const reticle=$('firstPersonAim');if(reticle){reticle.hidden=!eyeView||!controlled.alive;const screen=aim.clone();screen.y=.9;screen.project(camera);reticle.style.left=((screen.x+1)*50)+'%';reticle.style.top=((1-screen.y)*50)+'%'}
+if(eyeView&&!controlled.alive){$('returnNotice').hidden=false;$('returnNotice').textContent=phase==='over'?'SIDELINED · ROUND COMPLETE':`SIDELINED · RETURN IN ${controlled.outTime.toFixed(1)}s${phase==='paused'?' · PAUSED':''}`}
+renderer.render(scene,camera);if(eyeView){const auto=renderer.autoClear,shadow=renderer.shadowMap.autoUpdate;renderer.autoClear=false;renderer.shadowMap.autoUpdate=false;renderer.clearDepth();camera.layers.set(1);renderer.render(scene,camera);camera.layers.set(0);renderer.autoClear=auto;renderer.shadowMap.autoUpdate=shadow}controlled.g.visible=bodyVisible;if(held){held.mesh.visible=ballVisible;held.flame.visible=flameVisible}}frame();
 // Read-only match snapshot for diagnostics.
-window.courtside={getState:()=>({camera:{mode:firstPerson?'first':'third',eye:firstPerson&&(phase==='playing'||phase==='paused')&&controlled.alive,position:camera.position.toArray(),heldBall:viewBall.visible},stage,teamSize,bajillionMode,infinityMode,throws:throwHistory.slice(),holdTime,explosions:{radius:SUPER_RADIUS,count:explosions.length,total:explosionCount},fire:{count:hazards.length,maxLife:Math.max(0,...hazards.map(h=>h.life))},crowd:{time:crowdReactionTime,eliminatedTeam:crowdLastTeam,reactions:crowdReactionCount,audioReactions:crowdAudioCount,audioNodes:crowdSources.length,north:crowdLastTeam===null?null:crowdLastTeam===0?"boo":"cheer",south:crowdLastTeam===null?null:crowdLastTeam===1?"boo":"cheer"},muted,phase,remaining,sudden,score:[...score],controlled:controlled.id,players:players.map(p=>({team:p.team,id:p.id,alive:p.alive,blockTime:p.blockTime,catchTime:p.catchTime,jumpY:p.jumpY,jumpCd:p.jumpCd,superMeter:p.superMeter,superArmed:p.superArmed,throwPlan:p.throwPlan,wind:p.wind,outTime:p.outTime,protection:p.protection,x:p.x,z:p.z,ball:!!p.ball,dodge:p.dodge,catchCd:p.catchCd})),balls:balls.map(b=>({live:b.live,homing:b.homingTarget?{team:b.homingTarget.team,id:b.homingTarget.id}:null,reflections:b.reflections,flaming:b.flaming,superShot:b.superShot,thrower:b.thrower?{team:b.thrower.team,id:b.thrower.id}:null,held:!!b.holder,x:b.pos.x,y:b.pos.y,z:b.pos.z}))})};
+window.courtside={getState:()=>({camera:{mode:firstPerson?'first':'third',eye:firstPerson&&(phase==='playing'||phase==='paused'||phase==='over'),position:camera.position.toArray(),heldBall:viewBall.visible,arms:viewArms.visible,armsPose,armTeam:controlled.team},stage,teamSize,bajillionMode,infinityMode,throws:throwHistory.slice(),holdTime,explosions:{radius:SUPER_RADIUS,count:explosions.length,total:explosionCount},fire:{count:hazards.length,maxLife:Math.max(0,...hazards.map(h=>h.life))},crowd:{time:crowdReactionTime,eliminatedTeam:crowdLastTeam,reactions:crowdReactionCount,audioReactions:crowdAudioCount,audioNodes:crowdSources.length,north:crowdLastTeam===null?null:crowdLastTeam===0?"boo":"cheer",south:crowdLastTeam===null?null:crowdLastTeam===1?"boo":"cheer"},muted,phase,remaining,sudden,score:[...score],controlled:controlled.id,players:players.map(p=>({team:p.team,id:p.id,alive:p.alive,blockTime:p.blockTime,catchTime:p.catchTime,jumpY:p.jumpY,jumpCd:p.jumpCd,superMeter:p.superMeter,superArmed:p.superArmed,throwPlan:p.throwPlan,wind:p.wind,outTime:p.outTime,protection:p.protection,x:p.x,z:p.z,ball:!!p.ball,dodge:p.dodge,catchCd:p.catchCd})),balls:balls.map(b=>({live:b.live,homing:b.homingTarget?{team:b.homingTarget.team,id:b.homingTarget.id}:null,reflections:b.reflections,flaming:b.flaming,superShot:b.superShot,thrower:b.thrower?{team:b.thrower.team,id:b.thrower.id}:null,held:!!b.holder,x:b.pos.x,y:b.pos.y,z:b.pos.z}))})};
 
 // The authoritative server and browser replica share one rules implementation.
 const netFields=['alive','lifeId','x','z','jumpY','jumpV','jumpCd','outTime','protection','superMeter','superArmed','catchTime','blockTime','catchCd','dodge','dash','wind','netCharge','netCharging'];
