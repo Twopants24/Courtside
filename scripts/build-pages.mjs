@@ -2,18 +2,12 @@ import {mkdir,copyFile,cp,writeFile,rm,readFile} from 'node:fs/promises';
 const root=new URL('../',import.meta.url),out=new URL('dist/',root);
 await rm(out,{recursive:true,force:true});
 await mkdir(new URL('node_modules/three/build/',out),{recursive:true});
-for(const file of ['index.html','game.js','mobile.js','style.css'])await copyFile(new URL(file,root),new URL(file,out));
+for(const file of ['index.html','game.js','mobile.js','style.css','online.js','peer-transport.js','peer-simulation.js','peer-headless.js'])await copyFile(new URL(file,root),new URL(file,out));
 await cp(new URL('stages/',root),new URL('stages/',out),{recursive:true});
 for(const file of ['three.module.js','three.core.js'])await copyFile(new URL('node_modules/three/build/'+file,root),new URL('node_modules/three/build/'+file,out));
 await copyFile(new URL('node_modules/three/LICENSE',root),new URL('node_modules/three/LICENSE',out));
-// A static frontend can connect to a separately hosted authoritative server.
-const backend=process.env.COURTSIDE_SERVER_URL;
-if(backend){
- const url=new URL(backend);if(url.protocol!=='https:'||url.username||url.password)throw Error('COURTSIDE_SERVER_URL must be a public HTTPS origin without credentials');
- const online=await readFile(new URL('online.js',root),'utf8');
- await writeFile(new URL('online.js',out),online.replace('const matchOrigin=new URL(location.origin);','const matchOrigin=new URL('+JSON.stringify(url.origin)+');'));
-}else{
- await writeFile(new URL('online.js',out),`const note=document.createElement('p');note.textContent='SINGLE PLAYER · Online rooms are not configured for this build.';note.className='desktop';document.getElementById('start').after(note);\n`);
-}
+await mkdir(new URL('node_modules/peerjs/dist/',out),{recursive:true});
+await copyFile(new URL('node_modules/peerjs/dist/peerjs.min.js',root),new URL('node_modules/peerjs/dist/peerjs.min.js',out));
+await copyFile(new URL('node_modules/peerjs/LICENSE',root),new URL('node_modules/peerjs/LICENSE',out));
 await writeFile(new URL('.nojekyll',out),'');
-console.log('Built Pages site in dist/; multiplayer '+(backend?'enabled':'not configured'));
+console.log('Built peer-to-peer Pages site in dist/');

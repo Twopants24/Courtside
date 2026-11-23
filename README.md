@@ -13,7 +13,7 @@ npm ci
 npm start
 ```
 
-Open [COURTSIDE locally](http://localhost:8124/?v=23) in a WebGL-capable browser. Keep the terminal running. Press Ctrl+C to stop the server. No build step, API keys, or accounts are needed for local play. The server listens on all network interfaces; localhost links only work on the computer running it.
+Open [COURTSIDE locally](http://localhost:8124/?v=25) in a WebGL-capable browser. Keep the terminal running. Press Ctrl+C to stop the server. No build step, API keys, or accounts are needed for local play. The server listens on all network interfaces; localhost links only work on the computer running it.
 
 ## Mobile touch controls (v20)
 
@@ -26,7 +26,7 @@ Phones and tablets with a coarse primary pointer and viewport up to 1400 CSS pix
 - **Super:** arms an earned super shot. The button shows meter percentage and armed status.
 - **Pause and sound:** remain available at the top. Cancelled touches, losing focus, resizing, and pausing clear held movement and charging without firing an accidental shot.
 
-The Node version also accepts mobile analog input for private online duels. GitHub Pages supports online duels when built with a reachable multiplayer server URL.
+The peer-to-peer version accepts mobile analog input for private online duels on GitHub Pages.
 
 ## Stages
 
@@ -50,7 +50,7 @@ Toggle **Infinity Mode** before play or on the pause screen. The clock shows ∞
 
 ## Play
 
-Run `npm ci` once, then `npm start` in this folder and open http://localhost:8124/?v=23. Node.js 24 is recommended. This serves both the game and authoritative WebSocket match server. `PORT` overrides 8124. For single-player static serving only, `npm run single` uses Python 3 on port 8123. Requires a browser with WebGL and either a keyboard/mouse or a touchscreen. Fonts use an optional Google Fonts connection and fall back to system fonts offline.
+Run `npm ci` once, then `npm start` in this folder and open http://localhost:8124/?v=25. Node.js 24 is recommended. This serves the game and the legacy WebSocket match server; the browser client now uses peer-to-peer multiplayer. `PORT` overrides 8124. For single-player static serving only, `npm run single` uses Python 3 on port 8123. Requires a browser with WebGL and either a keyboard/mouse or a touchscreen. Fonts use an optional Google Fonts connection and fall back to system fonts offline.
 
 - **WASD:** Move. Walk over a safe ball to pick it up.
 - **Mouse:** Aim at the court.
@@ -71,33 +71,30 @@ Gold rings under AI players signal a throw windup. White rings indicate an activ
 Verified in Chromium: movement, keyboard dodge/catch, pause/resume, mouse hold/release, pickup, charged velocity, hit elimination, same-player sideline return, safe bounced balls, catch ownership and thrower elimination, dash protection and cooldown, timer decisions, sudden death, team wipe, and rematch reset. Gameplay uses a fixed 120 Hz physics step.
 
 
-## Online private 1v1 (v19)
+## Peer-to-peer private 1v1 (v25)
 
-Choose a stage, click **Play Online**, then **Create Room**. Copy the invite link to your friend, or have them enter the six-character code. Both players click **Ready to Play**. North hosts; South joins, with the camera and WASD oriented toward the opposing half. Both are human controlled. Online uses normal 1v1 rules and three balls. Existing single-player sizes, Infinity Mode, and Bajillion Balls are restored when leaving online.
+Select a stage and click **Play Online · Peer to Peer → Create Room**. Share the invite link or eight-character code with one friend. They join, then both click **Ready to Play**. North is the host and South is the guest. Desktop keyboard/mouse, mobile touch controls, and both camera views work online.
 
-Escape or the online menu pauses both players. Both must ready up to resume. At round end, both ready for a rematch; series scores persist. Disconnects pause the match and reserve the seat for 60 seconds. Reconnecting or refreshing the same browser tab restores its seat with a private session token; both players then ready up. Explicitly leaving ends the room for both players. There are no accounts or public matchmaking.
+The host's browser runs the shared rules in a module worker at 120 Hz and sends snapshots at 20 Hz over a WebRTC data channel. Inputs and gameplay stay between the players. PeerJS Cloud is used for initial signaling, with public STUN for direct connection discovery; there is no tunnel or centrally hosted match server. No microphone or camera permissions are needed.
 
-The Node server runs the shared game rules in a worker per room at 120 Hz and sends snapshots at 20 Hz. Clients send only bounded movement, aim, and actions; the server resolves throws, catches, blocks, cooldowns, collisions, and wins. Rendering interpolates player positions. This initial version has no latency prediction or lag compensation, so a nearby host gives better timing. Eight simultaneous rooms are supported. Rooms are in memory and end if the server restarts.
+Keep the host game open and in the foreground. Hiding a game or pausing pauses the match; both players ready up to resume. Both ready up for a rematch after a round. The host keeps scores and match outcomes authoritative. A guest may refresh/reconnect within 60 seconds using the same tab; the host must remain open. Refreshing or closing the host ends the match. No host migration is provided.
 
-## Hosting
+Same-Wi-Fi connections work when the network permits devices to communicate. Internet is still needed to load the site and introduce the players. Some restrictive networks or symmetric NAT combinations cannot establish a direct connection without a TURN relay; this build does not configure a relay. Connection errors explain how to retry. The host is trusted and can alter the simulation; this is a friends-only game, not a competitive anti-cheat service.
 
-Single-player is published at https://twopants24.github.io/Courtside/ (capital C). Pages publishes the prebuilt `gh-pages` branch from its root. Build updated static assets with `npm ci` and `npm run build:pages`, then commit the contents of `dist/` to `gh-pages`. In Settings → Pages, choose **Deploy from a branch**, **gh-pages**, **/ (root)**. Changes to `main` alone do not republish the site. The generated `dist/` contains the root index and required Three.js modules; it excludes the Node server. Preview it with a static HTTP server if needed.
+## Hosting and publishing
 
-GitHub Pages serves the frontend; the authoritative Node server runs separately. To enable private online duels in the Pages build, set the public HTTPS server origin when building:
+The complete game, including peer-to-peer multiplayer, runs from GitHub Pages at https://twopants24.github.io/Courtside/. Build it with:
 
 ```sh
-COURTSIDE_SERVER_URL=https://your-match-server.example npm run build:pages
+npm ci
+npm run build:pages
 ```
 
-Publish the resulting `dist/` to `gh-pages`. The build includes the real room client and connects it to the server over WSS. Room invite links stay on the Pages site. Without this variable the build stays single-player. Local `npm start` automatically connects to its own server.
+Publish the contents of `dist/` to the `gh-pages` branch root. No backend environment variable or temporary tunnel address is required. The build includes the browser simulation worker, shared game rules, Three.js and PeerJS assets. GitHub Pages must use **Deploy from a branch → gh-pages → / (root)**.
 
-A temporary Cloudflare Quick Tunnel can provide the HTTPS origin without an account. It depends on the host computer and both processes staying online, and its URL changes when restarted; rebuild and republish after a URL change. For reliable always-on multiplayer, deploy the Node server on a persistent host and configure that stable origin instead.
+`npm start` still serves the game locally at http://localhost:8124/. The older Node WebSocket room service remains available for compatibility, but the shipped browser client uses peer-to-peer transport. Docker can serve the same files. No paid hosting or account is needed for a friend-hosted match.
 
-For temporary internet play, start the game with `npm start`, then run `cloudflared tunnel --url http://localhost:8124` after installing Cloudflare's `cloudflared` CLI. Share the HTTPS address printed by the tunnel, then use the game's invite links. This free Quick Tunnel needs no account, but its address changes on restart and it only works while the computer, game server, and tunnel remain running and connected. It is not durable hosting.
-
-For persistent deployment, use a Node/container host that supports WebSockets and long-running workers. The supplied Dockerfile runs as a non-root user. Build with `docker build -t courtside .`, then `docker run --rm -p 8124:8124 courtside`. Terminate HTTPS at the host's proxy and forward `/ws` upgrades to the same process as HTTP. `/health` provides a health check. Use one instance; rooms are not shared across multiple server processes. The static server only exposes game assets, not server code or local files. No paid service or account has been configured.
-
-Verification: two independent WebSocket clients passed create/join, both-ready start, independent movement, authoritative hit/win, pause, token-based reconnect, and rematch through both localhost and the public WSS endpoint. Browser contexts passed invite entry, guest controls, refresh/rejoin, and return to restored single-player settings. Additional local checks cover an authoritative catch, rejecting client-submitted scores, and a full room.
+Verification includes separate desktop-host/mobile-guest browser contexts, real touch input, ready/start, host-authoritative hit/win, rematch, pause, guest refresh/rejoin, and return to single-player. Browser WebRTC statistics verify a connected data channel and direct candidate pair.
 
 ## Camera views (v22)
 
