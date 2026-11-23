@@ -13,7 +13,7 @@ npm ci
 npm start
 ```
 
-Open [COURTSIDE locally](http://localhost:8124/?v=25) in a WebGL-capable browser. Keep the terminal running. Press Ctrl+C to stop the server. No build step, API keys, or accounts are needed for local play. The server listens on all network interfaces; localhost links only work on the computer running it.
+Open [COURTSIDE locally](http://localhost:8124/?v=26) in a WebGL-capable browser. Keep the terminal running. Press Ctrl+C to stop the server. No build step, API keys, or accounts are needed for local play. The server listens on all network interfaces; localhost links only work on the computer running it.
 
 ## Mobile touch controls (v20)
 
@@ -50,7 +50,7 @@ Toggle **Infinity Mode** before play or on the pause screen. The clock shows ∞
 
 ## Play
 
-Run `npm ci` once, then `npm start` in this folder and open http://localhost:8124/?v=25. Node.js 24 is recommended. This serves the game and the legacy WebSocket match server; the browser client now uses peer-to-peer multiplayer. `PORT` overrides 8124. For single-player static serving only, `npm run single` uses Python 3 on port 8123. Requires a browser with WebGL and either a keyboard/mouse or a touchscreen. Fonts use an optional Google Fonts connection and fall back to system fonts offline.
+Run `npm ci` once, then `npm start` in this folder and open http://localhost:8124/?v=26. Node.js 24 is recommended. This serves the game and the legacy WebSocket match server; the browser client now uses peer-to-peer multiplayer. `PORT` overrides 8124. For single-player static serving only, `npm run single` uses Python 3 on port 8123. Requires a browser with WebGL and either a keyboard/mouse or a touchscreen. Fonts use an optional Google Fonts connection and fall back to system fonts offline.
 
 - **WASD:** Move. Walk over a safe ball to pick it up.
 - **Mouse:** Aim at the court.
@@ -73,7 +73,7 @@ Verified in Chromium: movement, keyboard dodge/catch, pause/resume, mouse hold/r
 
 ## Peer-to-peer private 1v1 (v25)
 
-Select a stage and click **Play Online · Peer to Peer → Create Room**. Share the invite link or eight-character code with one friend. They join, then both click **Ready to Play**. North is the host and South is the guest. Desktop keyboard/mouse, mobile touch controls, and both camera views work online.
+Select a stage and click **Play Online · Peer to Peer → Create Room**. Share the invite link or four-character code with one friend. They join, then both click **Ready to Play**. North is the host and South is the guest. Desktop keyboard/mouse, mobile touch controls, and both camera views work online.
 
 The host's browser runs the shared rules in a module worker at 120 Hz and sends snapshots at 20 Hz over a WebRTC data channel. Inputs and gameplay stay between the players. PeerJS Cloud is used for initial signaling, with public STUN for direct connection discovery; there is no tunnel or centrally hosted match server. No microphone or camera permissions are needed.
 
