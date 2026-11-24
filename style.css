@@ -38,3 +38,9 @@ body.first-person-view #superHud{top:112px;bottom:auto;left:auto;right:30px;tran
 @media(orientation:portrait){body.touch-device.first-person-view #touchHint{top:205px}body.touch-device.first-person-view #announcement{top:247px}body.touch-device.first-person-view #returnNotice{top:285px;font-size:15px}}
 /* Four-player lobby remains scrollable on short phone screens. */
 #onlinePanel{align-items:flex-start}.online-card{margin:auto}
+
+.triangle-preview{display:grid;place-items:center;aspect-ratio:8/5;background:#344451;color:#ffdc83;font-size:2rem}
+#goldTeam{color:#ffdc83}
+#goldTeam[hidden]{display:none}
+
+.stage-cards:has(.triangle-card){grid-template-columns:repeat(2,minmax(0,1fr))}
