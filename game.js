@@ -91,10 +91,13 @@ sign('THE GAUNTLET',0,5,-20,12,2.5);sign('JUMP LOW / USE COVER',0,2.5,-20,12,1);
 const courseStage=new THREE.Group();for(const object of scene.children.slice(courseStart))courseStage.add(object);scene.add(courseStage);courseStage.visible=false;
 function insideObstacle(x,z,o,pad=.45){return Math.abs(x-o.x)<o.w/2+pad&&Math.abs(z-o.z)<o.d/2+pad}
 const teamNames=['NORTH','SOUTH','GOLD'];
-const corners=[[0,15],[-11,-10],[11,-10]];
+const triangleScale=1.5;
+const corners=[[0,15],[-11,-10],[11,-10]].map(([x,z])=>[x*triangleScale,z*triangleScale]);
+const courtScale=()=>stage==='triangle'?triangleScale:1;
 const triangleStage=new THREE.Group();
 const cornerShare=.56;
 function triangleWeights(x,z){
+  x/=triangleScale;z/=triangleScale;
   const top=(z+10)/25;
   return [top,(1-top-x/11)/2,(1-top+x/11)/2];
 }
@@ -244,7 +247,7 @@ function setBajillion(enabled){
 document.querySelectorAll('.bajillion-toggle').forEach(input=>input.addEventListener('change',()=>setBajillion(input.checked)));
 function initialBallPosition(i,count){
   if(stage==='triangle'){
-    const angle=i*2.399963, radius=3.7*Math.sqrt((i+.5)/count);
+    const angle=i*2.399963, radius=3.7*triangleScale*Math.sqrt((i+.5)/count);
     return new THREE.Vector3(Math.cos(angle)*radius,.28,Math.sin(angle)*radius);
   }
   if(!bajillionMode)return safeBallPosition(new THREE.Vector3((i-(count-1)/2)*Math.min(4,18/(count-1)),.28,0));
@@ -270,6 +273,7 @@ function switchStage(next) {
   if(!['gym','arena','course','triangle'].includes(next)||next===stage)return;
   stage=next;gymStage.visible=stage==='gym';arenaStage.visible=stage==='arena';courseStage.visible=stage==='course';triangleStage.visible=stage==='triangle';
   const isArena=stage==='arena';
+  scene.fog.near=45*courtScale();scene.fog.far=95*courtScale();
   scene.fog.color.set(isArena?0x15283e:stage==='course'?0x78958b:0x819eaa);renderer.setClearColor(scene.fog.color);
   sun.color.set(isArena?0xdbeaff:0xfff5da);
   document.querySelectorAll('.stage-select').forEach(select=>select.value=stage);document.querySelectorAll('.stage-card').forEach(card=>card.setAttribute('aria-pressed',String(card.dataset.stage===stage)));
@@ -330,7 +334,7 @@ function disposeExplosion(fx){scene.remove(fx.mesh);fx.mesh.traverse(o=>{if(o.ge
 function explodeSuper(b,visualOnly=false){
   if(!b.superShot)return;
   const owner=b.superOwner;b.superShot=false;b.superOwner=null;explosionCount++;
-  const center=new THREE.Vector3(clamp(b.pos.x,-12,12),.06,clamp(b.pos.z,-16,16));
+  const center=new THREE.Vector3(clamp(b.pos.x,-12*courtScale(),12*courtScale()),.06,clamp(b.pos.z,-16*courtScale(),16*courtScale()));
   const clips=[new THREE.Plane(new THREE.Vector3(1,0,0),12),new THREE.Plane(new THREE.Vector3(-1,0,0),12),new THREE.Plane(new THREE.Vector3(0,0,1),16),new THREE.Plane(new THREE.Vector3(0,0,-1),16)];
   const fxMat=(color,opacity)=>new THREE.MeshBasicMaterial({color,transparent:true,opacity,side:THREE.DoubleSide,depthWrite:false,clippingPlanes:clips});
   renderer.localClippingEnabled=true;
@@ -513,7 +517,7 @@ for (const b of balls) {
     let flightEnd = 1;
     if (next.y < .28 && prev.y > .28) flightEnd = Math.min(flightEnd, (.28 - prev.y) / (next.y - prev.y));
     for (const axis of ['x', 'z']) {
-      const bound = axis === 'x' ? 11.65 : 15.65;
+      const bound = (axis === 'x' ? 11.65 : 15.65)*courtScale();
       if (Math.abs(next[axis]) > bound) flightEnd = Math.min(flightEnd, (Math.sign(next[axis]) * bound - prev[axis]) / (next[axis] - prev[axis]));
     }
     const triangleWall=stage==='triangle'?triangleTravel(prev.x,prev.z,next.x,next.z):null;
@@ -587,7 +591,7 @@ for (const b of balls) {
         b.live=false;extinguish(b);b.thrower=null;
       }
       for (const axis of ['x', 'z']) {
-        const bound = axis === 'x' ? 11.65 : 15.65;
+        const bound = (axis === 'x' ? 11.65 : 15.65)*courtScale();
         if (Math.abs(b.pos[axis]) > bound) {
           explodeSuper(b);if(phase!=='playing')return;
           b.pos[axis] = Math.sign(b.pos[axis]) * bound;
@@ -671,14 +675,14 @@ function updateViewArms(dt,visible,held){
 function setCameraMode(value){firstPerson=value;cameraSnap=true;document.querySelectorAll('.camera-toggle').forEach(b=>{b.textContent=firstPerson?'CAMERA · FIRST PERSON':'CAMERA · THIRD PERSON';b.setAttribute('aria-pressed',String(firstPerson))});mouse.set(0,0);touchAim=null;touchAutoAim=true;}
 document.querySelectorAll('.camera-toggle').forEach(b=>b.addEventListener('click',()=>setCameraMode(!firstPerson)));
 window.addEventListener('keydown',e=>{if(e.code==='KeyV'&&!e.repeat&&!e.target.closest?.('input,select,textarea')){e.preventDefault();setCameraMode(!firstPerson)}});
-function aimFromView(target){ray.setFromCamera(mouse,camera);if(!ray.ray.intersectPlane(plane,target)||ray.ray.direction.y>=-.015||target.distanceTo(camera.position)>40){target.copy(camera.position).addScaledVector(ray.ray.direction,30);target.y=.9}target.x=clamp(target.x,-12,12);target.z=clamp(target.z,-16,16);return target}
+function aimFromView(target){ray.setFromCamera(mouse,camera);if(!ray.ray.intersectPlane(plane,target)||ray.ray.direction.y>=-.015||target.distanceTo(camera.position)>40*courtScale()){target.copy(camera.position).addScaledVector(ray.ray.direction,30);target.y=.9}target.x=clamp(target.x,-12*courtScale(),12*courtScale());target.z=clamp(target.z,-16*courtScale(),16*courtScale());return target}
 function frame(){requestAnimationFrame(frame);let dt=Math.min(clock.getDelta(),.05);accumulator+=dt;while(accumulator>=1/120){if(!networkReplica)update(1/120);accumulator-=1/120}
 if(networkReplica)for(const p of players){if(p.renderTarget)p.g.position.lerp(p.renderTarget,1-Math.exp(-dt*22))}
 let active=phase==='playing'||phase==='paused',eyeView=firstPerson&&(active||phase==='over');
 const fov=eyeView?80:52;if(camera.fov!==fov){camera.fov=fov;camera.near=eyeView?.04:.1;camera.updateProjectionMatrix()}
-if(eyeView){const body=controlled.g.position,forward=controlled.team?1:-1;camera.position.set(body.x,body.y+1.65,body.z);if(controlled.alive)camera.lookAt(body.x,body.y+1.65-2,body.z+forward*15);else camera.lookAt(0,1.2,body.z*.25)}else{let dest=stage==='triangle'?new THREE.Vector3(0,27,29):active?new THREE.Vector3(controlled.alive?controlled.x*.35:0,18,controlled.alive?controlled.z+(controlled.team?-19:19):(controlled.team?-28:28)):new THREE.Vector3(13,21,30);if(cameraWasEye||cameraSnap)camera.position.copy(dest);else camera.position.lerp(dest,1-Math.exp(-dt*3));camera.lookAt(stage==='triangle'?0:active&&controlled.alive?controlled.x*.2:0,0,stage==='triangle'?0:active&&controlled.alive?controlled.z+(controlled.team?8:-8):0)}
+if(eyeView){const body=controlled.g.position,forward=controlled.team?1:-1;camera.position.set(body.x,body.y+1.65,body.z);if(controlled.alive)camera.lookAt(body.x,body.y+1.65-2,body.z+forward*15);else camera.lookAt(0,1.2,body.z*.25)}else{let dest=stage==='triangle'?new THREE.Vector3(0,27,29).multiplyScalar(triangleScale):active?new THREE.Vector3(controlled.alive?controlled.x*.35:0,18,controlled.alive?controlled.z+(controlled.team?-19:19):(controlled.team?-28:28)):new THREE.Vector3(13,21,30);if(cameraWasEye||cameraSnap)camera.position.copy(dest);else camera.position.lerp(dest,1-Math.exp(-dt*3));camera.lookAt(stage==='triangle'?0:active&&controlled.alive?controlled.x*.2:0,0,stage==='triangle'?0:active&&controlled.alive?controlled.z+(controlled.team?8:-8):0)}
 cameraWasEye=eyeView;cameraSnap=false;document.body?.classList.toggle('first-person-view',eyeView);
-aimFromView(aim);if(touchEnabled){if(touchAutoAim){const target=players.filter(p=>p.alive&&p.team!==controlled.team).sort((a,b)=>Math.hypot(a.x-controlled.x,a.z-controlled.z)-Math.hypot(b.x-controlled.x,b.z-controlled.z))[0];aim.set(target?.x??0,0,target?.z??(controlled.team?9:-9))}else if(touchAim)aim.copy(touchAim)}aim.x=clamp(aim.x,-12,12);aim.z=clamp(aim.z,-16,16);aimRing.position.set(aim.x,.06,aim.z);aimRing.visible=active&&controlled.alive;aimLine.visible=active&&!!controlled.ball;if(aimLine.visible){aimLine.geometry.setFromPoints([new THREE.Vector3(controlled.x,.08,controlled.z),new THREE.Vector3(aim.x,.08,aim.z)]);aimLine.computeLineDistances()}if(networkReplica){
+aimFromView(aim);if(touchEnabled){if(touchAutoAim){const target=players.filter(p=>p.alive&&p.team!==controlled.team).sort((a,b)=>Math.hypot(a.x-controlled.x,a.z-controlled.z)-Math.hypot(b.x-controlled.x,b.z-controlled.z))[0];aim.set(target?.x??0,0,target?.z??(controlled.team?9:-9))}else if(touchAim)aim.copy(touchAim)}aim.x=clamp(aim.x,-12*courtScale(),12*courtScale());aim.z=clamp(aim.z,-16*courtScale(),16*courtScale());aimRing.position.set(aim.x,.06,aim.z);aimRing.visible=active&&controlled.alive;aimLine.visible=active&&!!controlled.ball;if(aimLine.visible){aimLine.geometry.setFromPoints([new THREE.Vector3(controlled.x,.08,controlled.z),new THREE.Vector3(aim.x,.08,aim.z)]);aimLine.computeLineDistances()}if(networkReplica){
   if(phase==='playing'){fireClock+=dt;updateExplosions(dt)}
 }
 animateCrowd(dt);drawFire();
@@ -741,7 +745,7 @@ export const touchControls={
  move(x,y){touchMove=x||y?{x,y}:null},
  vector(){return touchMove},
  autoAim(value=true){touchAutoAim=value;touchAim=null},
- aimScreen(x,y){mouse.set(x/innerWidth*2-1,1-y/innerHeight*2);touchAim=aimFromView(new THREE.Vector3());touchAim.x=clamp(touchAim.x,-12,12);touchAim.z=clamp(touchAim.z,-16,16);touchAutoAim=false;aim.copy(touchAim)},
+ aimScreen(x,y){mouse.set(x/innerWidth*2-1,1-y/innerHeight*2);touchAim=aimFromView(new THREE.Vector3());touchAim.x=clamp(touchAim.x,-12*courtScale(),12*courtScale());touchAim.z=clamp(touchAim.z,-16*courtScale(),16*courtScale());touchAutoAim=false;aim.copy(touchAim)},
  action(action){
   if(networkReplica){window.dispatchEvent(new CustomEvent('touch-action',{detail:action}));return}
   if(action==='cancel'){charging=false;charge=0;holdTime=0;if(controlled.ball&&!controlled.superArmed)extinguish(controlled.ball);return}
