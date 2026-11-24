@@ -799,7 +799,7 @@ window.courtside={getState:()=>({camera:{mode:firstPerson?'first':'third',eye:fi
 const netFields=['networkHuman','alive','lifeId','x','z','jumpY','jumpV','jumpCd','outTime','protection','superMeter','superArmed','catchTime','blockTime','catchCd','dodge','dash','wind','netCharge','netCharging'];
 export const onlineEngine={
  start(stageName='gym',fresh=false,size=1,humans=null){
-  networkReplica=false;teamSize=size===2?2:1;infinityMode=false;bajillionMode=false;if(fresh){score=Array(teamCount()).fill(0);round=0}switchStage(['triangle','square'].includes(stageName)?'gym':stageName);reset();phase='playing';muted=!!globalThis.__COURTSIDE_SERVER__;
+  networkReplica=false;teamSize=[2,3].includes(size)?size:1;infinityMode=false;bajillionMode=false;if(fresh){score=Array(teamCount()).fill(0);round=0}switchStage(['triangle','square'].includes(stageName)?'gym':stageName);reset();phase='playing';muted=!!globalThis.__COURTSIDE_SERVER__;
   players.forEach((_,index)=>this.setHuman(index,humans?.[index]??true));
   controlled=players[0];$('overlay').style.display='none';return this.snapshot();
  },
