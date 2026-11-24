@@ -108,13 +108,18 @@ for(const x of [-14,14]){
   }
 }
 for(const side of [-1,1]){
-  for(const x of [-9,9])rangeObstacles.push({x,z:side*6.5,w:2.2,d:2,h:2.35,type:'ruin'});
-  rangeObstacles.push({x:0,z:side*7,w:3.6,d:.65,h:.56,type:'hurdle'});
+  rangeObstacles.push({x:side*8,z:side*6.5,w:3.1,d:2.6,h:2.6,type:'crystal'});
+  rangeObstacles.push({x:side*-5.5,z:side*8,w:2.5,d:2,h:.53,type:'ledge'});
 }
 for(const o of rangeObstacles){
-  box(o.w,o.h,o.d,o.type==='hurdle'?mat(0x735787):rock,o.x,o.h/2,o.z);
-  box(o.w,.1,o.d,edgeGlow,o.x,o.h-.05,o.z);
-  if(o.type==='ruin')box(.38,.68,.05,edgeGlow,o.x,o.h*.55,o.z+o.d/2+.025);
+  box(o.w,o.h,o.d,o.type==='ledge'?mat(0x735787):rock,o.x,o.h/2,o.z);
+  if(o.type==='ledge'){
+    box(o.w,.1,o.d,edgeGlow,o.x,o.h-.05,o.z);
+  }else{
+    const crystal=new THREE.Mesh(new THREE.OctahedronGeometry(1),edgeGlow);
+    crystal.position.set(o.x,o.h+.6,o.z);crystal.scale.set(.72,1.3,.72);
+    scene.add(crystal);
+  }
 }
 for(const [x,y,z,size] of [[-24,-8,-11,3],[26,-10,-13,4],[-22,-13,15,2.5],[22,-8,16,2]]){
   const shard=new THREE.Mesh(new THREE.OctahedronGeometry(size),rock);

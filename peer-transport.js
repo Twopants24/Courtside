@@ -24,7 +24,7 @@ export class DuelPeer {
   iceConfig().then(config=>{if(!this.closed){this.config=config;this.openPeer()}});
  }
  openPeer(){
-  this.peer=new window.Peer(this.host?'courtside-v35-'+this.code:undefined,{debug:0,config:this.config});
+  this.peer=new window.Peer(this.host?'courtside-v36-'+this.code:undefined,{debug:0,config:this.config});
   this.peer.on('open',()=>{this.readyState=1;this.onopen?.()});
   this.peer.on('connection',c=>this.accept(c));
   this.peer.on('disconnected',()=>{if(!this.closed)setTimeout(()=>{if(!this.closed&&this.peer.disconnected)this.peer.reconnect()},1000)});
@@ -57,13 +57,13 @@ export class DuelPeer {
  }
  send(raw){if(this.closed)return;let m;try{m=JSON.parse(raw)}catch{return}
   if(m.type==='create'&&this.host){
-   this.worker=new Worker(new URL('./peer-simulation.js?v=35',import.meta.url),{type:'module'});
+   this.worker=new Worker(new URL('./peer-simulation.js?v=36',import.meta.url),{type:'module'});
    this.worker.onerror=()=>{this.remote({type:'ended',message:'The host simulation stopped.'});this.emit({type:'ended',message:'The match could not start. Refresh and create a new room.'});this.close()};
    this.worker.onmessage=e=>{const m=e.data;if(m.type!=='state')return;this.state=m.state;if(m.state.phase==='playing')this.starting=false;if(m.state.phase==='over'&&this.mode==='playing'&&!this.starting){this.mode='over';this.ready.fill(false);this.room()}this.emit(m);this.remote(m)};
    this.emit({type:'joined',code:this.code,player:0,team:0,token:crypto.randomUUID()});this.room();return;
   }
   if(m.type==='join'&&!this.host){
-   this.conn=this.peer.connect('courtside-v35-'+this.code,{reliable:true,serialization:'json'});
+   this.conn=this.peer.connect('courtside-v36-'+this.code,{reliable:true,serialization:'json'});
    const timeout=setTimeout(()=>{if(!this.joined){this.emit({type:'error',message:'Direct connection timed out. Keep both games open and try the same Wi-Fi. Some networks require a relay.'});this.close()}},20000);this.joinTimer=timeout;
    this.conn.on('open',()=>this.remote({type:'hello',token:m.token}));
    this.conn.on('data',m=>{if(!m||typeof m!=='object')return;if(m.type==='joined'){this.joined=true;clearTimeout(timeout)}this.emit(m)});
