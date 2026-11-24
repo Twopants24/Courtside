@@ -607,8 +607,8 @@ window.courtside={getState:()=>({camera:{mode:firstPerson?'first':'third',eye:fi
 // The authoritative server and browser replica share one rules implementation.
 const netFields=['alive','lifeId','x','z','jumpY','jumpV','jumpCd','outTime','protection','superMeter','superArmed','catchTime','blockTime','catchCd','dodge','dash','wind','netCharge','netCharging'];
 export const onlineEngine={
- start(stageName='gym',fresh=false){
-  networkReplica=false;teamSize=1;infinityMode=false;bajillionMode=false;if(fresh){score=[0,0];round=0}switchStage(stageName);reset();phase='playing';muted=!!globalThis.__COURTSIDE_SERVER__;
+ start(stageName='gym',fresh=false,size=1){
+  networkReplica=false;teamSize=size===2?2:1;infinityMode=false;bajillionMode=false;if(fresh){score=[0,0];round=0}switchStage(stageName);reset();phase='playing';muted=!!globalThis.__COURTSIDE_SERVER__;
   for(const p of players){p.networkHuman=true;p.netKeys={};p.netMove=null;p.netAim={x:0,z:p.team?9:-9};p.netCharge=0;p.netCharging=false}
   controlled=players[0];$('overlay').style.display='none';return this.snapshot();
  },
@@ -621,13 +621,13 @@ export const onlineEngine={
   if(action==='up'&&p.netCharging){if(p.ball)throwBall(p,Math.min(1,p.netCharge/1.1),p.netAim);p.netCharging=false;p.netCharge=0}
  },
  step(dt){update(dt)},
- snapshot(){return {round,stage,phase,remaining,sudden,score:[...score],message:$('message').textContent,fireClock,crowd:{count:crowdReactionCount,team:crowdLastTeam},
+ snapshot(){return {round,stage,teamSize,phase,remaining,sudden,score:[...score],message:$('message').textContent,fireClock,crowd:{count:crowdReactionCount,team:crowdLastTeam},
   players:players.map(p=>({...Object.fromEntries(netFields.map(k=>[k,p[k]??0])),team:p.team,id:p.id,ball:balls.indexOf(p.ball),rotation:p.g.rotation.y,scale:p.g.scale.toArray(),limbs:p.limbs.map(l=>l.rotation.x)})),
   balls:balls.map(b=>({pos:b.pos.toArray(),vel:b.vel.toArray(),live:b.live,flaming:b.flaming,superShot:b.superShot,holder:players.indexOf(b.holder),owner:players.indexOf(b.thrower),homing:players.indexOf(b.homingTarget)})),
   hazards:hazards.map(h=>({x:h.x,z:h.z,life:h.life,team:h.team,super:h.super})),explosions:explosions.map(f=>({id:f.id,x:f.mesh.position.x,z:f.mesh.position.z,life:f.life}))}},
- beginReplica(team,s){if(!networkReplica)networkSettings={stage,teamSize,infinityMode,bajillionMode};teamSize=1;infinityMode=false;bajillionMode=false;switchStage(s.stage);reset();networkReplica=true;networkRound=-1;controlled=players[team];$('overlay').style.display='none';$('pauseScreen').hidden=true;this.apply(s,team)},
+ beginReplica(team,s){if(!networkReplica)networkSettings={stage,teamSize,infinityMode,bajillionMode};teamSize=s.teamSize||1;infinityMode=false;bajillionMode=false;switchStage(s.stage);reset();networkReplica=true;networkRound=-1;controlled=players[team];$('overlay').style.display='none';$('pauseScreen').hidden=true;this.apply(s,team)},
  apply(s,team){
-  if(networkRound!==s.round){teamSize=1;reset();controlled=players[team];networkRound=s.round}
+  if(networkRound!==s.round){teamSize=s.teamSize||1;reset();controlled=players[team];networkRound=s.round}
   networkReplica=true;phase=s.phase;remaining=s.remaining;sudden=s.sudden;score=[...s.score];fireClock=s.fireClock;
   for(let i=0;i<players.length;i++){let p=players[i],v=s.players[i];if(p.alive&&!v.alive)burst(new THREE.Vector3(p.x,1,p.z),p.team?0xff9981:0x89ffcf);for(const k of netFields)p[k]=v[k];p.ball=v.ball<0?null:balls[v.ball];p.g.visible=true;p.g.rotation.y=v.rotation;p.g.scale.fromArray(v.scale);p.renderTarget=new THREE.Vector3(v.x,v.jumpY+(v.dash>0?.18:0),v.z);if(p.g.position.distanceTo(p.renderTarget)>5)p.g.position.copy(p.renderTarget);p.limbs.forEach((l,j)=>l.rotation.x=v.limbs[j]);p.marker.visible=p===controlled||!p.alive||p.protection>0||p.catchTime>0||p.blockTime>0;p.marker.position.y=.055-v.jumpY;p.marker.material.color.set(!p.alive?0xffd35d:p.blockTime>0?0x8ccfff:p.protection>0?0x6de8ff:0xb8ffdb)}
   for(let i=0;i<balls.length;i++){const b=balls[i],v=s.balls[i];b.pos.fromArray(v.pos);b.vel.fromArray(v.vel);b.live=v.live;b.flaming=v.flaming;b.superShot=v.superShot;b.holder=v.holder<0?null:players[v.holder];b.thrower=v.owner<0?null:players[v.owner];b.homingTarget=v.homing<0?null:players[v.homing];b.mesh.position.copy(b.pos);const blue=b.superShot||b.holder?.superArmed;b.mesh.material=b.flaming?(blue?blueFireMaterial:fireMaterial):gold;b.flame.material=blue?blueFireMaterial:fireMaterial;b.flame.visible=b.flaming;b.flame.position.copy(b.pos).add(new THREE.Vector3(0,.5,0));b.trail.visible=b.live;b.trail.material.color.set(blue?0x79f4ff:0xffdc6c);b.trail.geometry.setFromPoints([b.pos,b.pos.clone().addScaledVector(b.vel,-.065)])}
@@ -641,7 +641,7 @@ export const onlineEngine={
   $('ballStatus').textContent=controlled.ball?'BALL IN HAND · HOLD TO CHARGE':'FIND A BALL';$('defenseLabel').textContent=controlled.ball?'BLOCK':'CATCH';
   $('charge').style.width=Math.min(100,controlled.netCharge/1.1*100)+'%';$('overcharge').style.width=Math.max(0,(controlled.netCharge-1.1)/1.9*100)+'%';$('overchargeLabel').textContent=controlled.ball?.flaming?'FIRE READY':'OVERCHARGE · HOLD 3s';
   $('jumpStatus').textContent=controlled.jumpCd>0?controlled.jumpCd.toFixed(1)+'s':'READY';$('dodgeStatus').textContent=controlled.dodge>0?controlled.dodge.toFixed(1)+'s':'READY';$('catchStatus').textContent=controlled.catchCd>0?controlled.catchCd.toFixed(1)+'s':'READY';
-  document.querySelector('.playercard small').textContent='ONLINE / '+(team?'SOUTH':'NORTH');
+  document.querySelector('.playercard small').textContent='ONLINE / '+(controlled.team?'SOUTH':'NORTH');
  },
  aim(){return {x:aim.x,z:aim.z}},
  leave(){networkReplica=false;for(const p of players)p.networkHuman=false;phase='intro';if(networkSettings){const saved=networkSettings;teamSize=saved.teamSize;infinityMode=saved.infinityMode;bajillionMode=saved.bajillionMode;switchStage(saved.stage)}reset();$('overlay').style.display='flex';$('pauseScreen').hidden=true;document.querySelector('h1').innerHTML='OWN THE<br><em>COURT.</em>';document.querySelector('.eyebrow').textContent='PICK YOUR MOMENT. TAKE YOUR SHOT.';document.querySelector('.intro p').innerHTML='Grab a ball, line up a shot, and keep moving.';document.querySelector('.tips').style.display='flex';$('start').innerHTML='LET’S PLAY <span>↗</span>';document.querySelector('.playercard small').textContent='ON COURT / NORTH';document.querySelectorAll('.size-select').forEach(e=>e.value=String(teamSize));document.querySelectorAll('.infinity-toggle').forEach(e=>e.checked=infinityMode);document.querySelectorAll('.bajillion-toggle').forEach(e=>e.checked=bajillionMode)}

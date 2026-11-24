@@ -36,3 +36,5 @@ canvas:focus{outline:none}#pauseScreen{position:absolute;inset:0;background:#102
 body.first-person-view #superHud{top:112px;bottom:auto;left:auto;right:30px;transform:none;width:190px}body.first-person-view .controls{display:none}body.first-person-view #crowdReaction{top:205px}body.touch-device.first-person-view #superHud{top:110px;bottom:auto;right:max(12px,env(safe-area-inset-right));width:105px;padding:6px}body.touch-device.first-person-view .bottom{top:110px;bottom:auto;left:max(12px,env(safe-area-inset-left))}body.touch-device.first-person-view .playercard{width:115px}body.touch-device.first-person-view #crowdReaction{top:180px}
 
 @media(orientation:portrait){body.touch-device.first-person-view #touchHint{top:205px}body.touch-device.first-person-view #announcement{top:247px}body.touch-device.first-person-view #returnNotice{top:285px;font-size:15px}}
+/* Four-player lobby remains scrollable on short phone screens. */
+#onlinePanel{align-items:flex-start}.online-card{margin:auto}
