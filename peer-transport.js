@@ -1,13 +1,30 @@
 import './node_modules/peerjs/dist/peerjs.min.js';
 const roomCode=()=>Array.from(crypto.getRandomValues(new Uint8Array(4)),n=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[n&31]).join('');
-// PeerJS Cloud only introduces peers. Match state and inputs use WebRTC data channels.
+// An optional same-origin endpoint can supply short-lived TURN credentials.
+async function iceConfig() {
+  const iceServers = [{urls:'stun:stun.l.google.com:19302'}];
+  try {
+    const response = await fetch(new URL('./turn-config.json', import.meta.url), {
+      cache:'no-store', signal:AbortSignal.timeout(2500),
+    });
+    if (response.ok) {
+      const config = await response.json();
+      if (Array.isArray(config.iceServers)) iceServers.push(...config.iceServers);
+    }
+  } catch {
+    // Direct connections remain available when the relay is unconfigured or unreachable.
+  }
+  return {iceServers};
+}
+// PeerJS Cloud introduces peers. Match state and inputs use WebRTC data channels.
 export class DuelPeer {
  constructor(command){
   this.readyState=0;this.host=command.type==='create';this.customCode=this.host&&!!command.code;this.code=this.host?(command.code||roomCode()):command.code;
-  this.stage=command.stage||'gym';this.capacity=command.capacity===2?2:4;this.mode='waiting';this.ready=Array(this.capacity).fill(false);this.seats=Array.from({length:this.capacity},()=>({conn:null,token:null,expiry:null}));this.closed=false;this.codeAttempts=0;this.openPeer();
+  this.stage=command.stage||'gym';this.capacity=command.capacity===2?2:4;this.mode='waiting';this.ready=Array(this.capacity).fill(false);this.seats=Array.from({length:this.capacity},()=>({conn:null,token:null,expiry:null}));this.closed=false;this.codeAttempts=0;
+  iceConfig().then(config=>{if(!this.closed){this.config=config;this.openPeer()}});
  }
  openPeer(){
-  this.peer=new window.Peer(this.host?'courtside-v27-'+this.code:undefined,{debug:0,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'}]}});
+  this.peer=new window.Peer(this.host?'courtside-v27-'+this.code:undefined,{debug:0,config:this.config});
   this.peer.on('open',()=>{this.readyState=1;this.onopen?.()});
   this.peer.on('connection',c=>this.accept(c));
   this.peer.on('disconnected',()=>{if(!this.closed)setTimeout(()=>{if(!this.closed&&this.peer.disconnected)this.peer.reconnect()},1000)});
@@ -40,7 +57,7 @@ export class DuelPeer {
  }
  send(raw){if(this.closed)return;let m;try{m=JSON.parse(raw)}catch{return}
   if(m.type==='create'&&this.host){
-   this.worker=new Worker(new URL('./peer-simulation.js?v=28',import.meta.url),{type:'module'});
+   this.worker=new Worker(new URL('./peer-simulation.js?v=29',import.meta.url),{type:'module'});
    this.worker.onerror=()=>{this.remote({type:'ended',message:'The host simulation stopped.'});this.emit({type:'ended',message:'The match could not start. Refresh and create a new room.'});this.close()};
    this.worker.onmessage=e=>{const m=e.data;if(m.type!=='state')return;this.state=m.state;if(m.state.phase==='playing')this.starting=false;if(m.state.phase==='over'&&this.mode==='playing'&&!this.starting){this.mode='over';this.ready.fill(false);this.room()}this.emit(m);this.remote(m)};
    this.emit({type:'joined',code:this.code,player:0,team:0,token:crypto.randomUUID()});this.room();return;
@@ -68,5 +85,5 @@ export class DuelPeer {
   }
   if(m.type==='action'&&['jump','dodge','defend','super','down','up','cancel'].includes(m.action))this.worker.postMessage({type:'action',team,action:m.action});
  }
- close(){if(this.closed)return;this.closed=true;this.readyState=3;for(const s of this.seats)clearTimeout(s.expiry);clearTimeout(this.joinTimer);this.worker?.terminate();const peer=this.peer;setTimeout(()=>peer.destroy(),150);this.onclose?.()}
+ close(){if(this.closed)return;this.closed=true;this.readyState=3;for(const s of this.seats)clearTimeout(s.expiry);clearTimeout(this.joinTimer);this.worker?.terminate();const peer=this.peer;if(peer)setTimeout(()=>peer.destroy(),150);this.onclose?.()}
 }
