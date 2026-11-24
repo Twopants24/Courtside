@@ -90,38 +90,37 @@ for(const x of [-16,16]){box(.25,3,36,mat(0x426360),x,1,0);for(let z=-16;z<=16;z
 sign('THE GAUNTLET',0,5,-20,12,2.5);sign('JUMP LOW / USE COVER',0,2.5,-20,12,1);
 const courseStage=new THREE.Group();for(const object of scene.children.slice(courseStart))courseStage.add(object);scene.add(courseStage);courseStage.visible=false;
 const rangeStart=scene.children.length;
-const rangeScale=2.5,rangeObstacles=[];
-const rangeWidth=60,rangeLength=80;
-const sand=mat(0x9b7950),scrub=mat(0x656b40),chalk=mat(0xf3dfb2);
-box(170,.3,190,scrub,0,-.26,0);
-box(rangeWidth,.16,rangeLength,sand,0,-.09,0);
-box(rangeWidth-.3,.02,20,mat(0xb08b5e),0,0,0);
-for(const z of [-40,-10,10,40]){
-  for(let x=-29;x<30;x+=2)box(1.2,.025,.09,chalk,x,.025,z);
+const rangeScale=1.15,rangeWidth=28,rangeLength=34,rangeObstacles=[];
+const slate=mat(0x39394d),edgeGlow=mat(0x917bdf),rock=mat(0x27263b);
+box(rangeWidth,.36,rangeLength,slate,0,-.18,0);
+const islandBase=new THREE.Mesh(new THREE.CylinderGeometry(1,.35,8,4),rock);
+islandBase.rotation.y=Math.PI/4;islandBase.scale.set(rangeWidth/Math.SQRT2,1,rangeLength/Math.SQRT2);
+islandBase.position.y=-4.15;scene.add(islandBase);
+box(rangeWidth-.3,.02,8,mat(0x534b69),0,0,0);
+for(const z of [-17,-4,4,17]){
+  for(let x=-13;x<14;x+=2)box(1.2,.025,.09,edgeGlow,x,.03,z);
 }
-for(const x of [-30,30]){
-  box(.11,.025,80,chalk,x,.025,0);
-  for(let z=-40;z<=40;z+=8)box(.28,1.5,.28,dark,x,.75,z);
+for(const x of [-14,14]){
+  box(.11,.025,34,edgeGlow,x,.03,0);
+  for(const z of [-16,16]){
+    const crystal=new THREE.Mesh(new THREE.OctahedronGeometry(1),new THREE.MeshBasicMaterial({color:0xb799ff}));
+    crystal.scale.set(.55,1.6,.55);crystal.position.set(x,1.6,z);scene.add(crystal);
+  }
 }
 for(const side of [-1,1]){
-  for(const x of [-21,21]){
-    rangeObstacles.push({x,z:side*16,w:5,d:2.6,h:2.8,type:'barricade'});
-    rangeObstacles.push({x:x*.8,z:side*29,w:3.4,d:3,h:2.3,type:'rock'});
-  }
-  rangeObstacles.push({x:0,z:side*16,w:5,d:.85,h:.6,type:'hurdle'});
-  for(const x of [-8,8])rangeObstacles.push({x,z:side*34,w:4,d:2.2,h:1.45,type:'wagon'});
+  for(const x of [-9,9])rangeObstacles.push({x,z:side*6.5,w:2.2,d:2,h:2.35,type:'ruin'});
+  rangeObstacles.push({x:0,z:side*7,w:3.6,d:.65,h:.56,type:'hurdle'});
 }
 for(const o of rangeObstacles){
-  const color={rock:0x746c61,barricade:0x614333,hurdle:0xae7544,wagon:0x785035}[o.type];
-  box(o.w,o.h,o.d,mat(color),o.x,o.h/2,o.z);
-  box(o.w,.11,o.d,mat(o.type==='hurdle'?0xf5c482:0xa68b6b),o.x,o.h-.055,o.z);
-  if(o.type==='wagon')for(const dx of [-1.2,1.2])for(const dz of [-1.18,1.18]){
-    const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.13,12),dark);
-    wheel.rotation.x=Math.PI/2;wheel.position.set(o.x+dx,.55,o.z+dz);scene.add(wheel);
-  }
+  box(o.w,o.h,o.d,o.type==='hurdle'?mat(0x735787):rock,o.x,o.h/2,o.z);
+  box(o.w,.1,o.d,edgeGlow,o.x,o.h-.05,o.z);
+  if(o.type==='ruin')box(.38,.68,.05,edgeGlow,o.x,o.h*.55,o.z+o.d/2+.025);
 }
-sign('OPEN RANGE',0,5,-43,16,2.8);
-for(const x of [-32,32])sign('NO MAN’S LAND',x,2.4,0,9,1.3);
+for(const [x,y,z,size] of [[-24,-8,-11,3],[26,-10,-13,4],[-22,-13,15,2.5],[22,-8,16,2]]){
+  const shard=new THREE.Mesh(new THREE.OctahedronGeometry(size),rock);
+  shard.scale.y=1.6;shard.position.set(x,y,z);scene.add(shard);
+}
+sign('AETHER ISLE',0,3.4,-17.2,9,1.5);
 const rangeStage=new THREE.Group();
 for(const object of scene.children.slice(rangeStart))rangeStage.add(object);
 scene.add(rangeStage);rangeStage.visible=false;
@@ -178,7 +177,7 @@ const squareStage=new THREE.Group();
 buildCornerCourt(squareStage,squareCorners,2*(1-squareCornerShare));
 const teamCount=()=>stage==='square'?4:stage==='triangle'?3:2;
 function spawnPoint(team,id,depth=.65){
-  if(stage==='range')return [spawnX(id)*1.45,(team?-1:1)*(depth>.7?27:24)];
+  if(stage==='range')return [spawnX(id)*.9,(team?-1:1)*(depth>.7?13:11)];
   if(!isCornerCourt())return [spawnX(id),team?-9:9];
   if(stage==='square'){
     const [x,z]=squareCorners[team];
@@ -316,7 +315,7 @@ function initialBallPosition(i,count){
   if(stage==='range'){
     const columns=Math.min(10,count),row=Math.floor(i/columns),rows=Math.ceil(count/columns);
     const rowLength=Math.min(columns,count-row*columns);
-    return new THREE.Vector3((i%columns-(rowLength-1)/2)*3.3,.28,(row-(rows-1)/2)*4);
+    return new THREE.Vector3((i%columns-(rowLength-1)/2)*2.35,.28,(row-(rows-1)/2)*2.5);
   }
   if(isCornerCourt()){
     const angle=i*2.399963, radius=3.7*triangleScale*Math.sqrt((i+.5)/count);
@@ -346,10 +345,10 @@ function switchStage(next) {
   stage=next;gymStage.visible=stage==='gym';arenaStage.visible=stage==='arena';courseStage.visible=stage==='course';triangleStage.visible=stage==='triangle';squareStage.visible=stage==='square';rangeStage.visible=stage==='range';
   const isArena=stage==='arena';
   scene.fog.near=45*courtScale();scene.fog.far=95*courtScale();
-  scene.fog.color.set(stage==='range'?0xbac7bb:isArena?0x15283e:stage==='course'?0x78958b:0x819eaa);renderer.setClearColor(scene.fog.color);
+  scene.fog.color.set(stage==='range'?0x25213e:isArena?0x15283e:stage==='course'?0x78958b:0x819eaa);renderer.setClearColor(scene.fog.color);
   sun.color.set(isArena?0xdbeaff:0xfff5da);
   document.querySelectorAll('.stage-select').forEach(select=>select.value=stage);document.querySelectorAll('.stage-card').forEach(card=>card.setAttribute('aria-pressed',String(card.dataset.stage===stage)));
-  $('stageLabel').textContent=stage==='range'?"OPEN RANGE / NO MAN’S LAND":stage==='square'?"SQUARE / NO MAN’S LAND":stage==='triangle'?"TRIANGLE / NO MAN’S LAND":isArena?'THE ARENA / STADIUM':stage==='course'?'OBSTACLE COURSE / THE GAUNTLET':'THE GYM / CLASSIC';
+  $('stageLabel').textContent=stage==='range'?"AETHER ISLE / NO MAN’S LAND":stage==='square'?"SQUARE / NO MAN’S LAND":stage==='triangle'?"TRIANGLE / NO MAN’S LAND":isArena?'THE ARENA / STADIUM':stage==='course'?'OBSTACLE COURSE / THE GAUNTLET':'THE GYM / CLASSIC';
   score=Array(teamCount()).fill(0);round=0;keys={};reset();
   if(phase==='over') {
     phase='intro';document.querySelector('.eyebrow').textContent='NEW STAGE. NEW MATCH.';
@@ -357,7 +356,7 @@ function switchStage(next) {
     document.querySelector('.intro p').innerHTML=`${teamSize} versus ${teamSize}. One team left standing.<br>Grab a ball, line up a shot, and keep moving.`;
     document.querySelector('.eyebrow').textContent='PICK YOUR MOMENT. TAKE YOUR SHOT.';document.querySelector('.intro p').innerHTML='Grab a ball, line up a shot, and keep moving.';document.querySelector('.tips').style.display='flex';$('start').innerHTML='LET’S PLAY <span>↗</span>';
   }
-  message(`${stage==='range'?'OPEN RANGE':stage==='square'?'SQUARE':stage==='triangle'?'TRIANGLE':isArena?'ARENA':stage==='course'?'OBSTACLE COURSE':'GYM'} SELECTED · MATCH RESET`,3);
+  message(`${stage==='range'?'AETHER ISLE':stage==='square'?'SQUARE':stage==='triangle'?'TRIANGLE':isArena?'ARENA':stage==='course'?'OBSTACLE COURSE':'GYM'} SELECTED · MATCH RESET`,3);
 }
 document.querySelectorAll('.stage-card').forEach(card=>{
   card.addEventListener('click',()=>switchStage(card.dataset.stage));
@@ -519,7 +518,7 @@ function eliminate(p,credit=null) {
   if(p.ball){const b=p.ball;b.holder=null;b.pos.set(p.x,.3,p.z);b.vel.set(0,0,0);b.live=false;b.thrower=null;extinguish(b);b.lock=.25;p.ball=null}
   p.jumpY=0;p.jumpV=0;p.jumpCd=0;p.blockTime=0;p.catchTime=0;p.catchCd=0;p.dash=0;p.dodge=0;p.wind=0;p.throwPlan=null;p.navPoint=null;p.target=null;p.move.set(0,0,0);
   p.x=p.team?14:-14;p.z=(p.team?-8:8)+(p.id-(teamSize-1)/2)*2.3;
-  if(stage==='range'){p.x=p.team?32:-32;p.z=(p.team?-24:24)+(p.id-(teamSize-1)/2)*2.8;}
+  if(stage==='range'){[p.x,p.z]=spawnPoint(p.team,p.id,.74);}
   if(isCornerCourt()){
     const [x,z]=spawnPoint(p.team,p.id,.74);
     p.x=x;p.z=z;
@@ -594,7 +593,7 @@ if(p!==controlled&&!p.networkHuman)steerObstacles(p);
 let speed=p===controlled||p.networkHuman?7.5:4.7;if(p.ball&&p.wind>0)speed*=.45;if(p.networkHuman?p.netCharging:p===controlled&&charging)speed*=.68;const oldX=p.x,oldZ=p.z;if(p.dash>0){p.x+=p.dir.x*20*dt;p.z+=p.dir.z*20*dt}else{p.x+=p.move.x*speed*dt;p.z+=p.move.z*speed*dt}if(isCornerCourt()){
   const {fraction}=cornerTravel(oldX,oldZ,p.x,p.z,p.team);
   p.x=oldX+(p.x-oldX)*fraction;p.z=oldZ+(p.z-oldZ)*fraction;
-}else if(stage==='range'){p.x=clamp(p.x,-29.4,29.4);p.z=clamp(p.z,-39.4,39.4);
+}else if(stage==='range'){p.x=clamp(p.x,-rangeWidth/2+.6,rangeWidth/2-.6);p.z=clamp(p.z,-rangeLength/2+.6,rangeLength/2-.6);
 }else{p.x=clamp(p.x,-11.3,11.3);p.z=clamp(p.z,p.team?-15.3:.48,p.team?-.48:15.3);}
 resolveObstacles(p);p.g.position.set(p.x,p.jumpY+(p.dash>0?.18:0),p.z);p.marker.position.y=.055-p.jumpY-(p.dash>0?.18:0);let tx=p.networkHuman?p.netAim.x:p===controlled?aim.x:p.target?.x??p.x,tz=p.networkHuman?p.netAim.z:p===controlled?aim.z:p.team?10:-10;p.g.rotation.y=Math.atan2(tx-p.x,tz-p.z);p.marker.visible=p===controlled||p.catchTime>0||p.blockTime>0||p.wind>.1||p.protection>0;p.marker.material.color.set(p.protection>0?0x6de8ff:p.blockTime>0?0x8ccfff:p.catchTime>0?0xffffff:p.throwPlan==='overcharge'&&p.wind>1.1?0xff793d:p.wind>.1?0xffca56:0xb8ffdb);p.marker.scale.setScalar(p.protection>0?1.2+Math.sin(performance.now()*.012)*.15:p.wind>0?1+Math.min(1,p.wind/3):1);p.g.scale.set(1,p.dash>0?.65:1,1);let stride=Math.sin(performance.now()*.014)*Math.min(1,p.move.length())*.45;p.limbs[0].rotation.x=stride;p.limbs[1].rotation.x=-stride;p.limbs[2].rotation.x=p.catchTime>0||p.blockTime>0?-1.5:0;p.limbs[3].rotation.x=p.blockTime>0?-1.5:p.ball?-(.7+(p.networkHuman?Math.min(1,(p.netCharge||0)/1.1):p===controlled?charge:Math.min(1,p.wind/1.1))*1.3):0;
 }
@@ -612,7 +611,7 @@ for (const b of balls) {
     let flightEnd = 1;
     if (next.y < .28 && prev.y > .28) flightEnd = Math.min(flightEnd, (.28 - prev.y) / (next.y - prev.y));
     for (const axis of ['x', 'z']) {
-      const bound = stage==='range'?(axis==='x'?29.7:39.7):(axis==='x'?11.65:15.65)*courtScale();
+      const bound = stage==='range'?((axis==='x'?rangeWidth:rangeLength)/2-.3):(axis==='x'?11.65:15.65)*courtScale();
       if (Math.abs(next[axis]) > bound) flightEnd = Math.min(flightEnd, (Math.sign(next[axis]) * bound - prev[axis]) / (next[axis] - prev[axis]));
     }
     const courtWall=isCornerCourt()?cornerTravel(prev.x,prev.z,next.x,next.z):null;
@@ -686,7 +685,7 @@ for (const b of balls) {
         b.live=false;extinguish(b);b.thrower=null;
       }
       for (const axis of ['x', 'z']) {
-        const bound = stage==='range'?(axis==='x'?29.7:39.7):(axis==='x'?11.65:15.65)*courtScale();
+        const bound = stage==='range'?((axis==='x'?rangeWidth:rangeLength)/2-.3):(axis==='x'?11.65:15.65)*courtScale();
         if (Math.abs(b.pos[axis]) > bound) {
           explodeSuper(b);if(phase!=='playing')return;
           b.pos[axis] = Math.sign(b.pos[axis]) * bound;
@@ -775,7 +774,7 @@ function frame(){requestAnimationFrame(frame);let dt=Math.min(clock.getDelta(),.
 if(networkReplica)for(const p of players){if(p.renderTarget)p.g.position.lerp(p.renderTarget,1-Math.exp(-dt*22))}
 let active=phase==='playing'||phase==='paused',eyeView=firstPerson&&(active||phase==='over');
 const fov=eyeView?80:52;if(camera.fov!==fov){camera.fov=fov;camera.near=eyeView?.04:.1;camera.updateProjectionMatrix()}
-if(eyeView){const body=controlled.g.position,yaw=viewYaw();camera.position.set(body.x,body.y+1.65,body.z);camera.lookAt(body.x-Math.sin(yaw)*Math.cos(lookPitch),body.y+1.65+Math.sin(lookPitch),body.z-Math.cos(yaw)*Math.cos(lookPitch))}else{let dest=stage==='range'?(active?new THREE.Vector3(controlled.x*.78,25,controlled.z+(controlled.team?-26:26)):new THREE.Vector3(43,67,67)):isCornerCourt()?new THREE.Vector3(0,27,29).multiplyScalar(triangleScale):active?new THREE.Vector3(controlled.alive?controlled.x*.35:0,18,controlled.alive?controlled.z+(controlled.team?-19:19):(controlled.team?-28:28)):new THREE.Vector3(13,21,30);if(cameraWasEye||cameraSnap)camera.position.copy(dest);else camera.position.lerp(dest,1-Math.exp(-dt*3));camera.lookAt(stage==='range'&&active?controlled.x*.78:isCornerCourt()?0:active&&controlled.alive?controlled.x*.2:0,0,isCornerCourt()?0:active&&controlled.alive?controlled.z+(controlled.team?8:-8):0)}
+if(eyeView){const body=controlled.g.position,yaw=viewYaw();camera.position.set(body.x,body.y+1.65,body.z);camera.lookAt(body.x-Math.sin(yaw)*Math.cos(lookPitch),body.y+1.65+Math.sin(lookPitch),body.z-Math.cos(yaw)*Math.cos(lookPitch))}else{let dest=stage==='range'?(active?new THREE.Vector3(controlled.x*.55,18,controlled.z+(controlled.team?-20:20)):new THREE.Vector3(23,24,36)):isCornerCourt()?new THREE.Vector3(0,27,29).multiplyScalar(triangleScale):active?new THREE.Vector3(controlled.alive?controlled.x*.35:0,18,controlled.alive?controlled.z+(controlled.team?-19:19):(controlled.team?-28:28)):new THREE.Vector3(13,21,30);if(cameraWasEye||cameraSnap)camera.position.copy(dest);else camera.position.lerp(dest,1-Math.exp(-dt*3));camera.lookAt(stage==='range'&&active?controlled.x*.78:isCornerCourt()?0:active&&controlled.alive?controlled.x*.2:0,0,isCornerCourt()?0:active&&controlled.alive?controlled.z+(controlled.team?8:-8):0)}
 cameraWasEye=eyeView;cameraSnap=false;document.body?.classList.toggle('first-person-view',eyeView);
 aimFromView(aim);if(touchEnabled){if(touchAutoAim){const target=players.filter(p=>p.alive&&p.team!==controlled.team).sort((a,b)=>Math.hypot(a.x-controlled.x,a.z-controlled.z)-Math.hypot(b.x-controlled.x,b.z-controlled.z))[0];aim.set(target?.x??0,0,target?.z??(controlled.team?9:-9))}else if(touchAim)aim.copy(touchAim)}aim.x=clamp(aim.x,-12*courtScale(),12*courtScale());aim.z=clamp(aim.z,-16*courtScale(),16*courtScale());aimRing.position.set(aim.x,.06,aim.z);aimRing.visible=active&&controlled.alive;aimLine.visible=active&&!!controlled.ball;if(aimLine.visible){aimLine.geometry.setFromPoints([new THREE.Vector3(controlled.x,.08,controlled.z),new THREE.Vector3(aim.x,.08,aim.z)]);aimLine.computeLineDistances()}if(networkReplica){
   if(phase==='playing'){fireClock+=dt;updateExplosions(dt)}
