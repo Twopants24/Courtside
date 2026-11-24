@@ -28,7 +28,7 @@ export class DuelPeer {
   this.peer.on('open',()=>{this.readyState=1;this.onopen?.()});
   this.peer.on('connection',c=>this.accept(c));
   this.peer.on('disconnected',()=>{if(!this.closed)setTimeout(()=>{if(!this.closed&&this.peer.disconnected)this.peer.reconnect()},1000)});
-  this.peer.on('error',e=>{if(this.closed)return;if(this.host&&e.type==='unavailable-id'&&this.customCode){this.emit({type:'error',message:'That room code is already in use. Choose another code or leave it blank for a random one.'});this.close();return}if(this.host&&e.type==='unavailable-id'&&this.codeAttempts++<5){this.peer.removeAllListeners();this.peer.destroy();this.code=roomCode();this.openPeer();return}if(this.conn?.open||this.seats.some(s=>s.conn?.open))return;this.emit({type:'error',message:e.type==='peer-unavailable'?'Host not found. Ask your friend to keep their room open and check the code.':'Could not connect the players. Try again on the same Wi-Fi; some networks block direct connections.'});this.close()});
+  this.peer.on('error',e=>{if(this.closed)return;if(this.host&&e.type==='unavailable-id'&&this.customCode){this.emit({type:'error',message:'That room code is already in use. Choose another code or leave it blank for a random one.'});this.close();return}if(this.host&&e.type==='unavailable-id'&&this.codeAttempts++<5){this.peer.removeAllListeners();this.peer.destroy();this.code=roomCode();this.openPeer();return}if(this.conn?.open||this.seats.some(s=>s.conn?.open))return;this.emit({type:'error',message:e.type==='peer-unavailable'?'Room not found. Check the four-character code and make sure the host still has the room open. If needed, reload both games and create a fresh room.':'Could not reach multiplayer. Check your internet connection, then reload and try again.'});this.close()});
  }
  emit(m){if(!this.closed)this.onmessage?.({data:JSON.stringify(m)})}
  remote(m,c){if(c===undefined){if(this.host){for(const s of this.seats)this.remote(m,s.conn);return}c=this.conn}if(c?.open&&(!c.dataChannel||c.dataChannel.bufferedAmount<1000000))c.send(m)}
@@ -95,18 +95,23 @@ export class DuelPeer {
  }
  send(raw){if(this.closed)return;let m;try{m=JSON.parse(raw)}catch{return}
   if(m.type==='create'&&this.host){
-   this.worker=new Worker(new URL('./peer-simulation.js?v=37',import.meta.url),{type:'module'});
+   this.worker=new Worker(new URL('./peer-simulation.js?v=38',import.meta.url),{type:'module'});
    this.worker.onerror=()=>{this.remote({type:'ended',message:'The host simulation stopped.'});this.emit({type:'ended',message:'The match could not start. Refresh and create a new room.'});this.close()};
    this.worker.onmessage=e=>{const m=e.data;if(m.type!=='state')return;this.state=m.state;if(m.state.phase==='playing')this.starting=false;if(m.state.phase==='over'&&this.mode==='playing'&&!this.starting){this.mode='over';this.ready.fill(false);this.room()}this.emit(m);this.remote(m)};
    this.emit({type:'joined',code:this.code,player:0,team:0,token:crypto.randomUUID()});this.room();return;
   }
   if(m.type==='join'&&!this.host){
    this.conn=this.peer.connect('courtside-v37-'+this.code,{reliable:true,serialization:'json'});
-   const timeout=setTimeout(()=>{if(!this.joined){this.emit({type:'error',message:'Direct connection timed out. Keep both games open and try the same Wi-Fi. Some networks require a relay.'});this.close()}},20000);this.joinTimer=timeout;
+   const timeout=setTimeout(()=>{if(!this.joined){this.emit({type:'error',message:'The connection to the host timed out. Keep both tabs open and try using the same Wi-Fi or a shared hotspot. Some networks block direct connections.'});this.close()}},20000);this.joinTimer=timeout;
    this.conn.on('open',()=>this.remote({type:'hello',token:m.token}));
    this.conn.on('data',m=>{if(!m||typeof m!=='object')return;if(m.type==='joined'){this.joined=true;clearTimeout(timeout)}this.emit(m)});
    this.conn.on('close',()=>{clearTimeout(timeout);if(!this.closed){this.readyState=3;this.onclose?.()}});
-   this.conn.on('error',()=>this.conn.close());return;
+   this.conn.on('error',()=>{
+    if(!this.joined&&!this.closed){
+     this.emit({type:'error',message:'The room connection failed. Try opening the invite in Safari or Chrome and keep the host tab open.'});
+     this.close();
+    }else this.conn.close();
+   });return;
   }
   if(this.host)this.command(0,m);else this.remote(m);
  }

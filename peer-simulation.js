@@ -4,7 +4,7 @@ globalThis.document={getElementById:element,querySelector:element,querySelectorA
 globalThis.window={addEventListener(){},dispatchEvent(){}};globalThis.devicePixelRatio=1;globalThis.innerWidth=1280;globalThis.innerHeight=800;globalThis.requestAnimationFrame=()=>{};globalThis.__COURTSIDE_SERVER__=true;
 const pending=[];
 self.onmessage=({data})=>pending.push(data);
-let source=await (await fetch(new URL('./game.js?v=37',import.meta.url))).text();source=source.replace("'./node_modules/three/build/three.module.js'",JSON.stringify(new URL('./peer-headless.js',import.meta.url).href));
+let source=await (await fetch(new URL('./game.js?v=38',import.meta.url))).text();source=source.replace("'./node_modules/three/build/three.module.js'",JSON.stringify(new URL('./peer-headless.js',import.meta.url).href));
 const {onlineEngine:engine}=await import(URL.createObjectURL(new Blob([source],{type:'text/javascript'})));
 let active=false,tick=0,last=performance.now(),acc=0;
 function handle(m){
