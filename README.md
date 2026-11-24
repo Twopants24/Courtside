@@ -13,7 +13,7 @@ npm ci
 npm start
 ```
 
-Open [COURTSIDE locally](http://localhost:8124/?v=26) in a WebGL-capable browser. Keep the terminal running. Press Ctrl+C to stop the server. No build step, API keys, or accounts are needed for local play. The server listens on all network interfaces; localhost links only work on the computer running it.
+Open [COURTSIDE locally](http://localhost:8124/?v=27) in a WebGL-capable browser. Keep the terminal running. Press Ctrl+C to stop the server. No build step, API keys, or accounts are needed for local play. The server listens on all network interfaces; localhost links only work on the computer running it.
 
 ## Mobile touch controls (v20)
 
@@ -50,7 +50,7 @@ Toggle **Infinity Mode** before play or on the pause screen. The clock shows ∞
 
 ## Play
 
-Run `npm ci` once, then `npm start` in this folder and open http://localhost:8124/?v=26. Node.js 24 is recommended. This serves the game and the legacy WebSocket match server; the browser client now uses peer-to-peer multiplayer. `PORT` overrides 8124. For single-player static serving only, `npm run single` uses Python 3 on port 8123. Requires a browser with WebGL and either a keyboard/mouse or a touchscreen. Fonts use an optional Google Fonts connection and fall back to system fonts offline.
+Run `npm ci` once, then `npm start` in this folder and open http://localhost:8124/?v=27. Node.js 24 is recommended. This serves the game and the legacy WebSocket match server; the browser client now uses peer-to-peer multiplayer. `PORT` overrides 8124. For single-player static serving only, `npm run single` uses Python 3 on port 8123. Requires a browser with WebGL and either a keyboard/mouse or a touchscreen. Fonts use an optional Google Fonts connection and fall back to system fonts offline.
 
 - **WASD:** Move. Walk over a safe ball to pick it up.
 - **Mouse:** Aim at the court.
@@ -71,13 +71,13 @@ Gold rings under AI players signal a throw windup. White rings indicate an activ
 Verified in Chromium: movement, keyboard dodge/catch, pause/resume, mouse hold/release, pickup, charged velocity, hit elimination, same-player sideline return, safe bounced balls, catch ownership and thrower elimination, dash protection and cooldown, timer decisions, sudden death, team wipe, and rematch reset. Gameplay uses a fixed 120 Hz physics step.
 
 
-## Peer-to-peer private 1v1 (v25)
+## Peer-to-peer multiplayer (v27)
 
-Select a stage and click **Play Online · Peer to Peer → Create Room**. Share the invite link or four-character code with one friend. They join, then both click **Ready to Play**. North is the host and South is the guest. Desktop keyboard/mouse, mobile touch controls, and both camera views work online.
+Select a stage and click **Play Online · Peer to Peer → Create Room**. Choose **4 players · 2v2** (the default), or **2 players · 1v1**, before creating the room. Share the invite link or four-character code with your friends. All seats must connect and every player must click **Ready to Play**. Four-player rooms have two human players per team; the host is North 1 and guests fill South 1, North 2, then South 2. The lobby lists each player’s team and number. Desktop keyboard/mouse, mobile touch controls, and both camera views work online.
 
-The host's browser runs the shared rules in a module worker at 120 Hz and sends snapshots at 20 Hz over a WebRTC data channel. Inputs and gameplay stay between the players. PeerJS Cloud is used for initial signaling, with public STUN for direct connection discovery; there is no tunnel or centrally hosted match server. No microphone or camera permissions are needed.
+The host's browser runs the shared rules in a module worker at 120 Hz and sends snapshots at 20 Hz over a WebRTC data channel. Inputs and gameplay stay between the host and each guest. PeerJS Cloud is used for initial signaling, with public STUN for direct connection discovery; there is no tunnel or centrally hosted match server. No microphone or camera permissions are needed.
 
-Keep the host game open and in the foreground. Hiding a game or pausing pauses the match; both players ready up to resume. Both ready up for a rematch after a round. The host keeps scores and match outcomes authoritative. A guest may refresh/reconnect within 60 seconds using the same tab; the host must remain open. Refreshing or closing the host ends the match. No host migration is provided.
+Keep the host game open and in the foreground. Hiding a game or pausing pauses the match; all players ready up to resume. All players ready up for a rematch after a round. The host keeps scores and match outcomes authoritative. A full room rejects extra joiners. Any disconnect pauses everyone. A guest may refresh/reconnect within 60 seconds using the same tab; the host must remain open. Refreshing or closing the host ends the match. No host migration is provided.
 
 Same-Wi-Fi connections work when the network permits devices to communicate. Internet is still needed to load the site and introduce the players. Some restrictive networks or symmetric NAT combinations cannot establish a direct connection without a TURN relay; this build does not configure a relay. Connection errors explain how to retry. The host is trusted and can alter the simulation; this is a friends-only game, not a competitive anti-cheat service.
 
@@ -94,7 +94,7 @@ Publish the contents of `dist/` to the `gh-pages` branch root. No backend enviro
 
 `npm start` still serves the game locally at http://localhost:8124/. The older Node WebSocket room service remains available for compatibility, but the shipped browser client uses peer-to-peer transport. Docker can serve the same files. No paid hosting or account is needed for a friend-hosted match.
 
-Verification includes separate desktop-host/mobile-guest browser contexts, real touch input, ready/start, host-authoritative hit/win, rematch, pause, guest refresh/rejoin, and return to single-player. Browser WebRTC statistics verify a connected data channel and direct candidate pair.
+Verification includes separate desktop-host/mobile-guest browser contexts, four-player seat assignment and independent controls, real touch input, ready/start, host-authoritative hit/win, rematch, pause, guest refresh/rejoin, and return to single-player. Browser WebRTC statistics verify a connected data channel and direct candidate pair.
 
 ## Camera views (v22)
 
