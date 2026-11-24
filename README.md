@@ -99,3 +99,5 @@ Verification includes separate desktop-host/mobile-guest browser contexts, four-
 ## Camera views (v22)
 
 Third-person remains the default. Use **Camera** in match setup or the pause menu, or press **V**, to switch to first-person. The eye-height camera faces the opposing half and follows your position and jump. Aim within the view using the mouse, or use mobile auto aim / drag-to-aim. A white aiming ring and a small held-ball view keep shots readable without your own jersey blocking the view. Sidelined players keep an eye-level view from their side position, looking back across the court with a return countdown. Team-colored first-person arms show idle, held-ball, charging, throw, catch/block, jump, and dodge poses. Camera selection persists through pauses, rounds, and stage changes.
+
+Hosts can choose a four-character room code using letters A–Z and numbers 0–9, or leave the field blank for a random code. Codes are case-insensitive; a code already in use must be changed.
