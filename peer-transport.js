@@ -20,7 +20,7 @@ async function iceConfig() {
 export class DuelPeer {
  constructor(command){
   this.readyState=0;this.host=command.type==='create';this.customCode=this.host&&!!command.code;this.code=this.host?(command.code||roomCode()):command.code;
-  this.stage=command.stage||'gym';this.capacity=command.capacity===2?2:4;this.mode='waiting';this.started=false;this.ready=Array(this.capacity).fill(false);this.seats=Array.from({length:this.capacity},()=>({conn:null,token:null,expiry:null}));this.closed=false;this.codeAttempts=0;
+  this.stage=command.stage||'gym';this.capacity=[2,4,6].includes(command.capacity)?command.capacity:4;this.mode='waiting';this.started=false;this.ready=Array(this.capacity).fill(false);this.seats=Array.from({length:this.capacity},()=>({conn:null,token:null,expiry:null}));this.closed=false;this.codeAttempts=0;
   iceConfig().then(config=>{if(!this.closed){this.config=config;this.openPeer()}});
  }
  openPeer(){
@@ -35,7 +35,7 @@ export class DuelPeer {
  humanSeats(){return this.seats.map((seat,index)=>index===0||!!seat.conn?.open)}
  enoughReady(){
   const humans=this.humanSeats();
-  return (this.started&&this.capacity===4||humans.every(Boolean))&&humans.every((human,i)=>!human||this.ready[i]);
+  return (this.started&&this.capacity>2||humans.every(Boolean))&&humans.every((human,i)=>!human||this.ready[i]);
  }
  startMatch(){
   const resume=this.mode==='paused';
@@ -51,7 +51,7 @@ export class DuelPeer {
   const humans=this.humanSeats();
   const seats=this.seats.map((s,i)=>({
    team:Math.floor(i/(this.capacity/2)),number:i%(this.capacity/2)+1,
-   connected:humans[i],ready:this.ready[i],cpu:this.started&&this.capacity===4&&!humans[i],
+   connected:humans[i],ready:this.ready[i],cpu:this.started&&this.capacity>2&&!humans[i],
    reserved:!humans[i]&&!!s.token
   }));
   const message={type:'room',code:this.code,stage:this.stage,capacity:this.capacity,mode:this.mode,seats};
@@ -68,10 +68,16 @@ export class DuelPeer {
    if(player<0){
     if(m.type!=='hello')return;
     let slot=typeof m.token==='string'?this.seats.findIndex((s,i)=>i>0&&s.token===m.token):-1;
-    if(slot<0&&!this.started)slot=(this.capacity===4?[2,1,3]:[1]).find(i=>!this.seats[i].token)??-1;
+    if(slot<0&&!this.started){
+     const perTeam=this.capacity/2;
+     for(let i=0;i<this.capacity;i++){
+      const index=i%2===0?i/2:perTeam+(i-1)/2;
+      if(index!==0&&!this.seats[index].token){slot=index;break}
+     }
+    }
     if(slot<0||(this.capacity===2&&this.seats[slot].conn?.open)){this.remote({type:'error',message:'This room is full or reserved for reconnecting players.'},c);setTimeout(()=>c.close(),200);return}
     player=slot;const seat=this.seats[player];clearTimeout(handshake);clearTimeout(seat.expiry);const previous=seat.conn;seat.conn=c;previous?.close();seat.token ||= crypto.randomUUID();
-    if(this.started&&this.capacity===4)this.worker.postMessage({type:'human',team:player,value:true});
+    if(this.started&&this.capacity>2)this.worker.postMessage({type:'human',team:player,value:true});
     this.remote({type:'joined',code:this.code,player,team:Math.floor(player/(this.capacity/2)),token:seat.token},c);this.room();if(this.state)this.remote({type:'state',state:this.state},c);return;
    }
    if(this.seats[player].conn===c)this.command(player,m);
@@ -80,7 +86,7 @@ export class DuelPeer {
    clearTimeout(handshake);
    if(player<0||this.seats[player].conn!==c||this.closed)return;
    const seat=this.seats[player];seat.conn=null;this.ready[player]=false;
-   if(this.capacity===4){
+   if(this.capacity>2){
     if(this.started)this.worker.postMessage({type:'human',team:player,value:false});
     else seat.token=null;
     if(this.started)seat.expiry=setTimeout(()=>{seat.token=null;this.room()},60000);
@@ -95,7 +101,7 @@ export class DuelPeer {
  }
  send(raw){if(this.closed)return;let m;try{m=JSON.parse(raw)}catch{return}
   if(m.type==='create'&&this.host){
-   this.worker=new Worker(new URL('./peer-simulation.js?v=38',import.meta.url),{type:'module'});
+   this.worker=new Worker(new URL('./peer-simulation.js?v=39',import.meta.url),{type:'module'});
    this.worker.onerror=()=>{this.remote({type:'ended',message:'The host simulation stopped.'});this.emit({type:'ended',message:'The match could not start. Refresh and create a new room.'});this.close()};
    this.worker.onmessage=e=>{const m=e.data;if(m.type!=='state')return;this.state=m.state;if(m.state.phase==='playing')this.starting=false;if(m.state.phase==='over'&&this.mode==='playing'&&!this.starting){this.mode='over';this.ready.fill(false);this.room()}this.emit(m);this.remote(m)};
    this.emit({type:'joined',code:this.code,player:0,team:0,token:crypto.randomUUID()});this.room();return;
@@ -116,13 +122,13 @@ export class DuelPeer {
   if(this.host)this.command(0,m);else this.remote(m);
  }
  command(team,m){
-  if(m.type==='leave'&&team!==0&&this.capacity===4){
+  if(m.type==='leave'&&team!==0&&this.capacity>2){
    this.seats[team].conn?.close();return;
   }
   if(m.type==='leave'){this.end('A player left the room. Create a new room.');return}
   if(m.type==='pause'){this.pause();return}
   if(m.type==='go'){
-   if(team!==0||this.capacity!==4||!['waiting','over'].includes(this.mode)||this.humanSeats().every(Boolean))return;
+   if(team!==0||this.capacity<=2||!['waiting','over'].includes(this.mode)||this.humanSeats().every(Boolean))return;
    this.startMatch();this.room();return;
   }
   if(m.type==='ready'){
