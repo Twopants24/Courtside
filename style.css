@@ -43,4 +43,7 @@ body.first-person-view #superHud{top:112px;bottom:auto;left:auto;right:30px;tran
 #goldTeam{color:#ffdc83}
 #goldTeam[hidden]{display:none}
 
-.stage-cards:has(.triangle-card){grid-template-columns:repeat(2,minmax(0,1fr))}
+
+.square-preview,#violetTeam{color:#d6b6ff}
+#violetTeam[hidden]{display:none}
+#scoreboard:has(#violetTeam:not([hidden])){flex-wrap:wrap;justify-content:center}
