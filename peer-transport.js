@@ -101,25 +101,47 @@ export class DuelPeer {
  }
  send(raw){if(this.closed)return;let m;try{m=JSON.parse(raw)}catch{return}
   if(m.type==='create'&&this.host){
-   this.worker=new Worker(new URL('./peer-simulation.js?v=39',import.meta.url),{type:'module'});
+   this.worker=new Worker(new URL('./peer-simulation.js?v=40',import.meta.url),{type:'module'});
    this.worker.onerror=()=>{this.remote({type:'ended',message:'The host simulation stopped.'});this.emit({type:'ended',message:'The match could not start. Refresh and create a new room.'});this.close()};
    this.worker.onmessage=e=>{const m=e.data;if(m.type!=='state')return;this.state=m.state;if(m.state.phase==='playing')this.starting=false;if(m.state.phase==='over'&&this.mode==='playing'&&!this.starting){this.mode='over';this.ready.fill(false);this.room()}this.emit(m);this.remote(m)};
    this.emit({type:'joined',code:this.code,player:0,team:0,token:crypto.randomUUID()});this.room();return;
   }
-  if(m.type==='join'&&!this.host){
-   this.conn=this.peer.connect('courtside-v37-'+this.code,{reliable:true,serialization:'json'});
-   const timeout=setTimeout(()=>{if(!this.joined){this.emit({type:'error',message:'The connection to the host timed out. Keep both tabs open and try using the same Wi-Fi or a shared hotspot. Some networks block direct connections.'});this.close()}},20000);this.joinTimer=timeout;
-   this.conn.on('open',()=>this.remote({type:'hello',token:m.token}));
-   this.conn.on('data',m=>{if(!m||typeof m!=='object')return;if(m.type==='joined'){this.joined=true;clearTimeout(timeout)}this.emit(m)});
-   this.conn.on('close',()=>{clearTimeout(timeout);if(!this.closed){this.readyState=3;this.onclose?.()}});
-   this.conn.on('error',()=>{
-    if(!this.joined&&!this.closed){
-     this.emit({type:'error',message:'The room connection failed. Try opening the invite in Safari or Chrome and keep the host tab open.'});
-     this.close();
-    }else this.conn.close();
-   });return;
-  }
+  if(m.type==='join'&&!this.host){this.join(m.token);return}
   if(this.host)this.command(0,m);else this.remote(m);
+ }
+ join(token,attempt=1){
+  const conn=this.peer.connect('courtside-v37-'+this.code,{reliable:true,serialization:'json'});
+  if(!conn){
+   this.emit({type:'error',message:'The matchmaking connection dropped. Check your internet connection and tap Join again.'});
+   this.close();return;
+  }
+  this.conn=conn;
+  const fail=()=>{
+   if(this.closed||this.conn!==conn||this.joined)return;
+   clearTimeout(this.joinTimer);
+   this.conn=null;
+   conn.close();
+   if(attempt===1&&!this.peer.disconnected){
+    this.emit({type:'status',message:'Still connecting… Retrying once. Keep both game tabs open.'});
+    this.join(token,2);
+    return;
+   }
+   this.emit({type:'error',message:'The connection to the host timed out. Keep both game tabs open and try again on the same Wi-Fi or a shared hotspot. Some networks block direct play.'});
+   this.close();
+  };
+  this.joinTimer=setTimeout(fail,attempt===1?12000:16000);
+  conn.on('open',()=>{if(this.conn===conn)this.remote({type:'hello',token},conn)});
+  conn.on('data',message=>{
+   if(this.conn!==conn||!message||typeof message!=='object')return;
+   if(message.type==='joined'){this.joined=true;clearTimeout(this.joinTimer)}
+   this.emit(message);
+  });
+  conn.on('close',()=>{
+   if(this.closed||this.conn!==conn)return;
+   if(!this.joined){fail();return}
+   this.close();
+  });
+  conn.on('error',()=>{if(this.joined)conn.close();else fail()});
  }
  command(team,m){
   if(m.type==='leave'&&team!==0&&this.capacity>2){
