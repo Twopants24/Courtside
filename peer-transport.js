@@ -101,7 +101,7 @@ export class DuelPeer {
  }
  send(raw){if(this.closed)return;let m;try{m=JSON.parse(raw)}catch{return}
   if(m.type==='create'&&this.host){
-   this.worker=new Worker(new URL('./peer-simulation.js?v=40',import.meta.url),{type:'module'});
+   this.worker=new Worker(new URL('./peer-simulation.js?v=41',import.meta.url),{type:'module'});
    this.worker.onerror=()=>{this.remote({type:'ended',message:'The host simulation stopped.'});this.emit({type:'ended',message:'The match could not start. Refresh and create a new room.'});this.close()};
    this.worker.onmessage=e=>{const m=e.data;if(m.type!=='state')return;this.state=m.state;if(m.state.phase==='playing')this.starting=false;if(m.state.phase==='over'&&this.mode==='playing'&&!this.starting){this.mode='over';this.ready.fill(false);this.room()}this.emit(m);this.remote(m)};
    this.emit({type:'joined',code:this.code,player:0,team:0,token:crypto.randomUUID()});this.room();return;
