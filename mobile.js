@@ -1,5 +1,8 @@
-import {touchControls as input} from './game.js?v=42';
-const media=matchMedia('(pointer: coarse) and (max-width: 1400px)');
+import {touchControls as input} from './game.js?v=43';
+const media=matchMedia('(pointer: coarse)');
+const orientation=matchMedia('(orientation: portrait)');
+const mobileTouch=navigator.maxTouchPoints>0&&(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+let usedTouch=false;
 const panel=document.createElement('div');panel.id='touchControls';panel.hidden=true;
 panel.innerHTML=`<div class="touch-left"><button id="touchAim" aria-label="Use automatic aim" aria-pressed="true">AUTO AIM</button><div id="touchStick" role="group" aria-label="Movement joystick: drag to move"><span class="stick-ring"></span><span id="touchKnob"></span><small>MOVE</small></div></div><div class="touch-right"><div class="touch-row"><button id="touchSuper" aria-label="Arm super shot">SUPER<small>0%</small></button><button id="touchJump" aria-label="Jump">JUMP<small>READY</small></button></div><div class="touch-row"><button id="touchDash" aria-label="Dash">DASH<small>READY</small></button><button id="touchDefend" aria-label="Catch or block">CATCH<small>READY</small></button></div><button id="touchThrow" aria-label="Hold to charge, release to throw">THROW<small>HOLD TO CHARGE</small></button></div><div id="touchHint">Auto aim tracks the nearest opponent. Drag the court to aim yourself.</div>`;
 document.body.append(panel);
@@ -7,7 +10,7 @@ const $=id=>document.getElementById(id),stick=$('touchStick'),knob=$('touchKnob'
 const pointers=new Map();let enabled=false,lastLife='',wasPlayable=false;
 function end(id,cancel){const p=pointers.get(id);if(!p)return;pointers.delete(id);p.el.classList.remove('pressed');if(p.kind==='stick'){input.move(0,0);knob.style.transform='translate(-50%,-50%)'}if(p.kind==='throw')input.action(cancel?'cancel':'up');if(p.el.hasPointerCapture(id))p.el.releasePointerCapture(id)}
 function reset(){for(const id of [...pointers.keys()])end(id,true);input.cancel()}
-function configure(){reset();enabled=media.matches;input.enable(enabled);document.body.classList.toggle('touch-device',enabled);if(!enabled)panel.hidden=true}
+function configure(){reset();enabled=media.matches||mobileTouch||usedTouch;input.enable(enabled);document.body.classList.toggle('touch-device',enabled);if(!enabled)panel.hidden=true}
 function move(e){const p=pointers.get(e.pointerId);if(!p)return;e.preventDefault();if(p.kind==='stick'){const r=stick.getBoundingClientRect(),radius=r.width*.34;let x=(e.clientX-r.x-r.width/2)/radius,y=(e.clientY-r.y-r.height/2)/radius;const len=Math.hypot(x,y);if(len<.1){x=0;y=0}else if(len>1){x/=len;y/=len}input.move(x,y);knob.style.transform=`translate(calc(-50% + ${x*radius}px),calc(-50% + ${y*radius}px))`}if(p.kind==='aim'){if(!input.lookDrag(e.clientX-p.x,e.clientY-p.y))input.aimScreen(e.clientX,e.clientY);p.x=e.clientX;p.y=e.clientY}}
 function bind(el,kind,action){el.addEventListener('pointerdown',e=>{if(!enabled||e.pointerType==='mouse'||panel.hidden)return;e.preventDefault();if([...pointers.values()].some(p=>p.kind===kind))return;el.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{el,kind,x:e.clientX,y:e.clientY});el.classList.add('pressed');if(action)input.action(action);move(e)});el.addEventListener('pointermove',move);el.addEventListener('pointerup',e=>{e.preventDefault();end(e.pointerId,false)});el.addEventListener('pointercancel',e=>end(e.pointerId,true));el.addEventListener('lostpointercapture',e=>end(e.pointerId,true))}
 bind(stick,'stick');bind(canvas,'aim');bind($('touchThrow'),'throw','down');bind($('touchJump'),'jump','jump');bind($('touchDash'),'dash','dodge');bind($('touchDefend'),'defend','defend');bind($('touchSuper'),'super','super');
@@ -18,7 +21,13 @@ document.addEventListener('dblclick',event=>{
  if(!enabled||event.sourceCapabilities?.firesTouchEvents===false)return;
  if(event.target.closest?.('#game, #touchControls, #overlay, #pauseScreen, #onlinePanel, button'))event.preventDefault();
 },{capture:true,passive:false});
-window.addEventListener('blur',reset);document.addEventListener('visibilitychange',()=>{if(document.hidden)reset()});window.addEventListener('resize',reset);media.addEventListener('change',configure);configure();
+window.addEventListener('blur',reset);document.addEventListener('visibilitychange',()=>{if(document.hidden)reset()});// A moving browser toolbar can resize the viewport during a joystick drag or throw.
+orientation.addEventListener('change',reset);
+document.addEventListener('pointerdown',event=>{
+ if(event.pointerType!=='touch'||enabled)return;
+ usedTouch=true;configure();
+},{capture:true,passive:true});
+media.addEventListener('change',configure);configure();
 function tick(){requestAnimationFrame(tick);if(!enabled)return;const s=input.state(),playable=s.phase==='playing'&&s.alive&&!document.hidden;const life=s.round+':'+s.life+':'+s.alive;if((wasPlayable&&!playable)||lastLife!==life)reset();lastLife=life;wasPlayable=playable;panel.hidden=!playable;document.body.classList.toggle('touch-playing',s.phase==='playing');if(!playable)return;
  const feedback=(id,value)=>{$(id).querySelector('small').textContent=value>0?value.toFixed(1)+'s':'READY';$(id).classList.toggle('cooling',value>0)};feedback('touchJump',s.jump);feedback('touchDash',s.dodge);feedback('touchDefend',s.defense);$('touchDefend').firstChild.textContent=s.ball?'BLOCK':'CATCH';$('touchDefend').setAttribute('aria-label',s.ball?'Block':'Catch');$('touchSuper').querySelector('small').textContent=s.armed?'ARMED':Math.floor(s.meter)+'%';$('touchSuper').classList.toggle('armed',s.armed);$('touchThrow').querySelector('small').textContent=!s.ball?'FIND A BALL':s.hold>=3?'FIRE READY':s.hold>0?s.hold.toFixed(1)+' / 3s':'HOLD TO CHARGE';$('touchThrow').classList.toggle('cooling',!s.ball);$('touchThrow').style.setProperty('--charge',Math.min(100,s.hold/3*100)+'%');$('touchAim').textContent=s.autoAim?'AUTO AIM':'MANUAL · RESET';$('touchAim').setAttribute('aria-pressed',String(s.autoAim));
 }tick();
