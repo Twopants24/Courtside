@@ -4,11 +4,11 @@ globalThis.document={getElementById:element,querySelector:element,querySelectorA
 globalThis.window={addEventListener(){},dispatchEvent(){}};globalThis.devicePixelRatio=1;globalThis.innerWidth=1280;globalThis.innerHeight=800;globalThis.requestAnimationFrame=()=>{};globalThis.__COURTSIDE_SERVER__=true;
 const pending=[];
 self.onmessage=({data})=>pending.push(data);
-let source=await (await fetch(new URL('./game.js?v=44',import.meta.url))).text();source=source.replace("'./node_modules/three/build/three.module.js'",JSON.stringify(new URL('./peer-headless.js',import.meta.url).href));
+let source=await (await fetch(new URL('./game.js?v=45',import.meta.url))).text();source=source.replace("'./node_modules/three/build/three.module.js'",JSON.stringify(new URL('./peer-headless.js',import.meta.url).href));
 const {onlineEngine:engine}=await import(URL.createObjectURL(new Blob([source],{type:'text/javascript'})));
 let active=false,tick=0,last=performance.now(),acc=0;
 function handle(m){
- if(m.type==='start'){engine.start(m.stage,m.fresh,m.size,m.humans);active=true;last=performance.now();acc=0}
+ if(m.type==='start'){engine.start(m.stage,m.fresh,m.size,m.humans,m.rules);active=true;last=performance.now();acc=0}
  if(m.type==='human')engine.setHuman(m.team,m.value);
  if(m.type==='pause')engine.pause(m.value);
  if(m.type==='input')engine.input(m.team,m.data);
