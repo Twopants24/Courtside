@@ -2,7 +2,10 @@ import './node_modules/peerjs/dist/peerjs.min.js';
 const roomCode=()=>Array.from(crypto.getRandomValues(new Uint8Array(4)),n=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[n&31]).join('');
 // An optional same-origin endpoint can supply short-lived TURN credentials.
 async function iceConfig() {
-  const iceServers = [{urls:'stun:stun.l.google.com:19302'}];
+  const iceServers = [
+    {urls:'stun:stun.l.google.com:19302'},
+    {urls:'stun:stun.cloudflare.com:3478'},
+  ];
   try {
     const response = await fetch(new URL('./turn-config.json', import.meta.url), {
       cache:'no-store', signal:AbortSignal.timeout(2500),
@@ -101,7 +104,7 @@ export class DuelPeer {
  }
  send(raw){if(this.closed)return;let m;try{m=JSON.parse(raw)}catch{return}
   if(m.type==='create'&&this.host){
-   this.worker=new Worker(new URL('./peer-simulation.js?v=42',import.meta.url),{type:'module'});
+   this.worker=new Worker(new URL('./peer-simulation.js?v=43',import.meta.url),{type:'module'});
    this.worker.onerror=()=>{this.remote({type:'ended',message:'The host simulation stopped.'});this.emit({type:'ended',message:'The match could not start. Refresh and create a new room.'});this.close()};
    this.worker.onmessage=e=>{const m=e.data;if(m.type!=='state')return;this.state=m.state;if(m.state.phase==='playing')this.starting=false;if(m.state.phase==='over'&&this.mode==='playing'&&!this.starting){this.mode='over';this.ready.fill(false);this.room()}this.emit(m);this.remote(m)};
    this.emit({type:'joined',code:this.code,player:0,team:0,token:crypto.randomUUID()});this.room();return;
