@@ -60,3 +60,9 @@ body.first-person-view #superHud{top:112px;bottom:auto;left:auto;right:30px;tran
 .online-rules label small{display:block;margin-left:23px}
 .online-rules input{accent-color:#83eec5}
 #rulesHint{color:#bacfd2}
+
+#trainingTools,#trainingExit{display:none}
+body.training-mode #onlineLaunch,body.training-mode .team.away,body.training-mode #goldTeam,body.training-mode #violetTeam,body.training-mode #series{display:none}
+body.training-mode #trainingExit{display:inline-block;margin:0 8px 8px 0}
+body.training-playing #trainingTools{display:flex;gap:7px;position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:16;white-space:nowrap}
+#trainingTools button,#trainingExit{background:#183c49;color:#fff3cd;border:1px solid #869fa4;border-radius:6px;padding:8px 10px;min-height:36px;font-weight:700;font-size:10px}
