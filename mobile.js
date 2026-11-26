@@ -1,4 +1,4 @@
-import {touchControls as input} from './game.js?v=46';
+import {touchControls as input} from './game.js?v=47';
 const media=matchMedia('(pointer: coarse)');
 const orientation=matchMedia('(orientation: portrait)');
 const mobileTouch=navigator.maxTouchPoints>0&&(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
