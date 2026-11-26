@@ -53,3 +53,10 @@ body.first-person-view #superHud{top:112px;bottom:auto;left:auto;right:30px;tran
 @media (pointer: coarse){
   html, body, #onlinePanel, button, select, input {touch-action:manipulation}
 }
+
+.online-rules{margin:12px 0;padding:8px 12px;border:1px solid #b1ffe446;border-radius:8px}
+.online-rules legend{padding:0 4px;font-weight:700}
+.online-rules label{display:block;padding:5px 0}
+.online-rules label small{display:block;margin-left:23px}
+.online-rules input{accent-color:#83eec5}
+#rulesHint{color:#bacfd2}

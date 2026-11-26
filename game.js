@@ -894,8 +894,8 @@ window.courtside={getState:()=>({camera:{mode:firstPerson?'first':'third',eye:fi
 // The authoritative server and browser replica share one rules implementation.
 const netFields=['networkHuman','alive','lifeId','x','z','jumpY','jumpV','jumpCd','outTime','protection','superMeter','superArmed','catchTime','blockTime','catchCd','dodge','dash','wind','netCharge','netCharging'];
 export const onlineEngine={
- start(stageName='gym',fresh=false,size=1,humans=null){
-  networkReplica=false;teamSize=[2,3].includes(size)?size:1;infinityMode=false;bajillionMode=false;if(fresh){score=Array(teamCount()).fill(0);round=0}switchStage(['triangle','square'].includes(stageName)?'gym':stageName);reset();phase='playing';muted=!!globalThis.__COURTSIDE_SERVER__;
+ start(stageName='gym',fresh=false,size=1,humans=null,rules={}){
+  networkReplica=false;teamSize=[2,3].includes(size)?size:1;infinityMode=rules.infinity===true;bajillionMode=rules.bajillion===true;if(fresh){score=Array(teamCount()).fill(0);round=0}switchStage(['triangle','square'].includes(stageName)?'gym':stageName);reset();phase='playing';muted=!!globalThis.__COURTSIDE_SERVER__;
   players.forEach((_,index)=>this.setHuman(index,humans?.[index]??true));
   controlled=players[0];$('overlay').style.display='none';return this.snapshot();
  },
@@ -914,13 +914,13 @@ export const onlineEngine={
   if(action==='up'&&p.netCharging){if(p.ball)throwBall(p,Math.min(1,p.netCharge/1.1),p.netAim);p.netCharging=false;p.netCharge=0}
  },
  step(dt){update(dt)},
- snapshot(){return {round,stage,teamSize,phase,remaining,sudden,score:[...score],message:$('message').textContent,fireClock,crowd:{count:crowdReactionCount,team:crowdLastTeam},
+ snapshot(){return {round,stage,teamSize,infinityMode,bajillionMode,phase,remaining,sudden,score:[...score],message:$('message').textContent,fireClock,crowd:{count:crowdReactionCount,team:crowdLastTeam},
   players:players.map(p=>({...Object.fromEntries(netFields.map(k=>[k,p[k]??0])),team:p.team,id:p.id,ball:balls.indexOf(p.ball),rotation:p.g.rotation.y,scale:p.g.scale.toArray(),limbs:p.limbs.map(l=>l.rotation.x)})),
   balls:balls.map(b=>({pos:b.pos.toArray(),vel:b.vel.toArray(),live:b.live,flaming:b.flaming,superShot:b.superShot,holder:players.indexOf(b.holder),owner:players.indexOf(b.thrower),homing:players.indexOf(b.homingTarget)})),
   hazards:hazards.map(h=>({x:h.x,z:h.z,life:h.life,team:h.team,super:h.super})),explosions:explosions.map(f=>({id:f.id,x:f.mesh.position.x,z:f.mesh.position.z,life:f.life}))}},
- beginReplica(team,s){if(!networkReplica)networkSettings={stage,teamSize,infinityMode,bajillionMode};teamSize=s.teamSize||1;infinityMode=false;bajillionMode=false;switchStage(s.stage);reset();networkReplica=true;networkRound=-1;controlled=players[team];$('overlay').style.display='none';$('pauseScreen').hidden=true;this.apply(s,team)},
+ beginReplica(team,s){if(!networkReplica)networkSettings={stage,teamSize,infinityMode,bajillionMode};teamSize=s.teamSize||1;infinityMode=!!s.infinityMode;bajillionMode=!!s.bajillionMode;switchStage(s.stage);reset();networkReplica=true;networkRound=-1;controlled=players[team];$('overlay').style.display='none';$('pauseScreen').hidden=true;this.apply(s,team)},
  apply(s,team){
-  if(networkRound!==s.round){teamSize=s.teamSize||1;reset();controlled=players[team];networkRound=s.round}
+  if(networkRound!==s.round){teamSize=s.teamSize||1;infinityMode=!!s.infinityMode;bajillionMode=!!s.bajillionMode;reset();controlled=players[team];networkRound=s.round}
   networkReplica=true;phase=s.phase;remaining=s.remaining;sudden=s.sudden;score=[...s.score];fireClock=s.fireClock;
   for(let i=0;i<players.length;i++){let p=players[i],v=s.players[i];if(p.alive&&!v.alive)burst(new THREE.Vector3(p.x,1,p.z),p.team?0xff9981:0x89ffcf);for(const k of netFields)p[k]=v[k];p.ball=v.ball<0?null:balls[v.ball];p.g.visible=true;p.g.rotation.y=v.rotation;p.g.scale.fromArray(v.scale);p.renderTarget=new THREE.Vector3(v.x,v.jumpY+(v.dash>0?.18:0),v.z);if(p.g.position.distanceTo(p.renderTarget)>5)p.g.position.copy(p.renderTarget);p.limbs.forEach((l,j)=>l.rotation.x=v.limbs[j]);p.marker.visible=p===controlled||!p.alive||p.protection>0||p.catchTime>0||p.blockTime>0;p.marker.position.y=.055-v.jumpY;p.marker.material.color.set(!p.alive?0xffd35d:p.blockTime>0?0x8ccfff:p.protection>0?0x6de8ff:0xb8ffdb)}
   for(let i=0;i<balls.length;i++){const b=balls[i],v=s.balls[i];b.pos.fromArray(v.pos);b.vel.fromArray(v.vel);b.live=v.live;b.flaming=v.flaming;b.superShot=v.superShot;b.holder=v.holder<0?null:players[v.holder];b.thrower=v.owner<0?null:players[v.owner];b.homingTarget=v.homing<0?null:players[v.homing];b.mesh.position.copy(b.pos);const blue=b.superShot||b.holder?.superArmed;b.mesh.material=b.flaming?(blue?blueFireMaterial:fireMaterial):gold;b.flame.material=blue?blueFireMaterial:fireMaterial;b.flame.visible=b.flaming;b.flame.position.copy(b.pos).add(new THREE.Vector3(0,.5,0));b.trail.visible=b.live;b.trail.material.color.set(blue?0x79f4ff:0xffdc6c);b.trail.geometry.setFromPoints([b.pos,b.pos.clone().addScaledVector(b.vel,-.065)])}
@@ -929,7 +929,7 @@ export const onlineEngine={
   for(let i=explosions.length-1;i>=0;i--)if(!s.explosions.some(f=>f.id===explosions[i].id)){disposeExplosion(explosions[i]);explosions.splice(i,1)}
   if(s.crowd.count>crowdReactionCount&&s.crowd.team!==null)reactCrowd(s.crowd.team);crowdReactionCount=s.crowd.count;
   if($('message').textContent!==s.message)$('message').textContent=s.message;
-  sync();$('timer').textContent=sudden?'NEXT OUT':Math.floor(Math.max(0,remaining)/60)+':'+String(Math.floor(Math.max(0,remaining)%60)).padStart(2,'0');
+  sync();$('timer').textContent=infinityMode?'∞':sudden?'NEXT OUT':Math.floor(Math.max(0,remaining)/60)+':'+String(Math.floor(Math.max(0,remaining)%60)).padStart(2,'0');
   $('returnNotice').hidden=controlled.alive||phase!=='playing';$('returnNotice').textContent='BACK IN '+controlled.outTime.toFixed(1)+'s';
   $('ballStatus').textContent=controlled.ball?'BALL IN HAND · HOLD TO CHARGE':'FIND A BALL';$('defenseLabel').textContent=controlled.ball?'BLOCK':'CATCH';
   $('charge').style.width=Math.min(100,controlled.netCharge/1.1*100)+'%';$('overcharge').style.width=Math.max(0,(controlled.netCharge-1.1)/1.9*100)+'%';$('overchargeLabel').textContent=controlled.ball?.flaming?'FIRE READY':'OVERCHARGE · HOLD 3s';

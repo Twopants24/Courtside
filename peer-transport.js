@@ -23,11 +23,11 @@ async function iceConfig() {
 export class DuelPeer {
  constructor(command){
   this.readyState=0;this.host=command.type==='create';this.customCode=this.host&&!!command.code;this.code=this.host?(command.code||roomCode()):command.code;
-  this.stage=command.stage||'gym';this.capacity=[2,4,6].includes(command.capacity)?command.capacity:4;this.mode='waiting';this.started=false;this.ready=Array(this.capacity).fill(false);this.seats=Array.from({length:this.capacity},()=>({conn:null,token:null,expiry:null}));this.closed=false;this.codeAttempts=0;
+  this.stage=command.stage||'gym';this.capacity=[2,4,6].includes(command.capacity)?command.capacity:4;this.mode='waiting';this.started=false;this.rules={infinity:false,bajillion:false};this.rulesRevision=0;this.ready=Array(this.capacity).fill(false);this.seats=Array.from({length:this.capacity},()=>({conn:null,token:null,expiry:null}));this.closed=false;this.codeAttempts=0;
   iceConfig().then(config=>{if(!this.closed){this.config=config;this.openPeer()}});
  }
  openPeer(){
-  this.peer=new window.Peer(this.host?'courtside-v37-'+this.code:undefined,{debug:0,config:this.config});
+  this.peer=new window.Peer(this.host?'courtside-v45-'+this.code:undefined,{debug:0,config:this.config});
   this.peer.on('open',()=>{this.readyState=1;this.onopen?.()});
   this.peer.on('connection',c=>this.accept(c));
   this.peer.on('disconnected',()=>{if(!this.closed)setTimeout(()=>{if(!this.closed&&this.peer.disconnected)this.peer.reconnect()},1000)});
@@ -47,7 +47,7 @@ export class DuelPeer {
   this.ready.fill(false);
   this.starting=!resume;
   this.worker.postMessage(resume?{type:'pause',value:false}:{
-   type:'start',stage:this.stage,fresh:!this.state,size:this.capacity/2,humans:this.humanSeats()
+   type:'start',stage:this.stage,fresh:!this.state,size:this.capacity/2,humans:this.humanSeats(),rules:this.rules
   });
  }
  room(){
@@ -57,7 +57,7 @@ export class DuelPeer {
    connected:humans[i],ready:this.ready[i],cpu:this.started&&this.capacity>2&&!humans[i],
    reserved:!humans[i]&&!!s.token
   }));
-  const message={type:'room',code:this.code,stage:this.stage,capacity:this.capacity,mode:this.mode,seats};
+  const message={type:'room',code:this.code,stage:this.stage,capacity:this.capacity,mode:this.mode,seats,rules:this.rules,rulesRevision:this.rulesRevision,rulesLocked:this.started};
   this.emit(message);this.remote(message);
  }
  pause(){if(this.mode==='playing'){this.mode='paused';this.worker?.postMessage({type:'pause',value:true})}this.ready.fill(false);this.room()}
@@ -104,7 +104,7 @@ export class DuelPeer {
  }
  send(raw){if(this.closed)return;let m;try{m=JSON.parse(raw)}catch{return}
   if(m.type==='create'&&this.host){
-   this.worker=new Worker(new URL('./peer-simulation.js?v=44',import.meta.url),{type:'module'});
+   this.worker=new Worker(new URL('./peer-simulation.js?v=45',import.meta.url),{type:'module'});
    this.worker.onerror=()=>{this.remote({type:'ended',message:'The host simulation stopped.'});this.emit({type:'ended',message:'The match could not start. Refresh and create a new room.'});this.close()};
    this.worker.onmessage=e=>{const m=e.data;if(m.type!=='state')return;this.state=m.state;if(m.state.phase==='playing')this.starting=false;if(m.state.phase==='over'&&this.mode==='playing'&&!this.starting){this.mode='over';this.ready.fill(false);this.room()}this.emit(m);this.remote(m)};
    this.emit({type:'joined',code:this.code,player:0,team:0,token:crypto.randomUUID()});this.room();return;
@@ -113,7 +113,7 @@ export class DuelPeer {
   if(this.host)this.command(0,m);else this.remote(m);
  }
  join(token,attempt=1){
-  const conn=this.peer.connect('courtside-v37-'+this.code,{reliable:true,serialization:'json'});
+  const conn=this.peer.connect('courtside-v45-'+this.code,{reliable:true,serialization:'json'});
   if(!conn){
    this.emit({type:'error',message:'The matchmaking connection dropped. Check your internet connection and tap Join again.'});
    this.close();return;
@@ -152,12 +152,20 @@ export class DuelPeer {
   }
   if(m.type==='leave'){this.end('A player left the room. Create a new room.');return}
   if(m.type==='pause'){this.pause();return}
+  if(m.type==='rules'){
+   if(team!==0||this.started)return;
+   const rules={infinity:m.infinity===true,bajillion:m.bajillion===true};
+   if(rules.infinity===this.rules.infinity&&rules.bajillion===this.rules.bajillion)return;
+   this.rules=rules;this.rulesRevision++;this.ready.fill(false);
+   this.room();return;
+  }
   if(m.type==='go'){
    if(team!==0||this.capacity<=2||!['waiting','over'].includes(this.mode)||this.humanSeats().every(Boolean))return;
    this.startMatch();this.room();return;
   }
   if(m.type==='ready'){
    if(this.mode==='playing')return;
+   if(m.rulesRevision!==this.rulesRevision){this.room();return}
    this.ready[team]=m.ready===true;
    if(this.enoughReady())this.startMatch();
    this.room();return;
