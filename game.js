@@ -557,19 +557,23 @@ function addPlayerBody(g,team,id){
     const print=new THREE.Mesh(printPlane,jerseyPrints.get(key));
     print.position.set(0,1.245,side*.263);if(side<0)print.rotation.y=Math.PI;g.add(print);
   }
-  const limbs=[];
+  const limbs=[],knees=[];
   for(const side of [-1,1]){
     const leg=new THREE.Group();leg.position.set(side*.17,.815,0);
-    leg.add(modelMesh(`leg:${look}:${team}`,(oval,tube,boxPart)=>{
-      tube(shorts,0,-.125,0,.132,.29,.13);
-      tube(jersey,0,-.255,0,.132,.036,.13);
-      oval(skinColor,0,-.345,.026,.095,.155,.092);
-      tube(skinColor,0,-.48,.007,.081,.265,.078);
-      tube(0xf6ecdb,0,-.62,.005,.082,.143,.085);
-      oval(0x222737,0,-.735,.069,.108,.084,.171);
-      boxPart(0xe6dfce,0,-.797,.065,.197,.032,.263);
-      boxPart(jersey,0,-.688,.11,.13,.025,.056);
+    leg.add(modelMesh(`thigh:${look}:${team}`,(oval,tube)=>{
+      tube(shorts,0,-.137,0,.132,.30,.13);
+      tube(jersey,0,-.264,0,.132,.036,.13);
+      oval(skinColor,0,-.313,0,.093,.085,.088);
     }));
+    const knee=new THREE.Group();knee.position.y=-.345;
+    knee.add(modelMesh(`shin:${look}:${team}`,(oval,tube,boxPart)=>{
+      tube(skinColor,0,-.126,.007,.081,.29,.078);
+      tube(0xf6ecdb,0,-.275,.005,.082,.143,.085);
+      oval(0x222737,0,-.39,.069,.108,.084,.171);
+      boxPart(0xe6dfce,0,-.452,.065,.197,.032,.263);
+      boxPart(jersey,0,-.343,.11,.13,.025,.056);
+    }));
+    leg.add(knee);knees.push(knee);
     g.add(leg);limbs.push(leg);
   }
   for(const side of [-1,1]){
@@ -585,19 +589,85 @@ function addPlayerBody(g,team,id){
     }));
     g.add(arm);limbs.push(arm);
   }
-  return {limbs,complexion};
+  return {limbs,knees,complexion};
 }
 function makePlayer(team,id){
   const [x,z]=spawnPoint(team,id),g=new THREE.Group();
-  const {limbs,complexion}=addPlayerBody(g,team,id);
+  const rig=new THREE.Group();rig.rotation.order='YXZ';g.add(rig);
+  const {limbs,knees,complexion}=addPlayerBody(rig,team,id);
   const marker=new THREE.Mesh(new THREE.RingGeometry(.65,.74,40),new THREE.MeshBasicMaterial({color:0xb8ffdb,side:THREE.DoubleSide}));
   marker.rotation.x=-Math.PI/2;marker.position.y=.055;g.add(marker);
   g.position.set(x,0,z);g.rotation.y=team?0:Math.PI;marker.visible=team===0&&id===humanId();
   scene.add(g);
-  return {g,team,id,complexion,limbs,marker,x,z,alive:true,lifeId:0,blockTime:0,jumpY:0,jumpV:0,jumpCd:0,
+  return {g,rig,team,id,complexion,limbs,knees,marker,x,z,visualYaw:g.rotation.y,gait:0,pace:0,dodgeLean:0,alive:true,lifeId:0,blockTime:0,jumpY:0,jumpV:0,jumpCd:0,
     superMeter:0,superArmed:false,outTime:0,protection:0,ball:null,cool:1+Math.random(),dodge:0,dash:0,
     catchCd:0,catchTime:0,wind:0,throwPose:0,throwPlan:null,navPoint:null,target:null,
     dir:new THREE.Vector3(0,0,-1),move:new THREE.Vector3(),seed:Math.random()*6};
+}
+const angleDelta=(from,to)=>Math.atan2(Math.sin(to-from),Math.cos(to-from));
+const blend=(from,to,alpha)=>from+(to-from)*alpha;
+function animatePlayer(p,dx,dz,dt){
+  const rate=1-Math.exp(-dt*18),speed=Math.hypot(dx,dz)/dt;
+  const moving=Math.min(1,speed/6.5);
+  p.pace=blend(p.pace,moving,rate);
+  p.gait=(p.gait+Math.hypot(dx,dz)*1.75)%(Math.PI*2);
+
+  // Movement is expressed relative to aim so backpedals and side steps read differently.
+  const yaw=p.g.rotation.y,cos=Math.cos(yaw),sin=Math.sin(yaw);
+  const magnitude=Math.max(.001,Math.hypot(dx,dz));
+  const side=(dx*cos-dz*sin)/magnitude,forward=(dx*sin+dz*cos)/magnitude;
+  const defend=p.catchTime>0||p.blockTime>0;
+  const acting=defend||p.throwPose>0||!!p.ball;
+  const turn=acting?0:side*.57*p.pace;
+  p.visualYaw+=angleDelta(p.visualYaw,yaw+turn)*rate;
+  p.rig.rotation.y=angleDelta(yaw,p.visualYaw);
+
+  const airborne=p.jumpY>.08,rolling=p.dash>0;
+  const tuck=rolling?Math.sin(Math.PI*clamp(1-p.dash/.24,0,1))*.7+.3:0;
+  p.dodgeLean=blend(p.dodgeLean,tuck,1-Math.exp(-dt*25));
+  const dodgeSide=p.dir.x*cos-p.dir.z*sin,dodgeForward=p.dir.x*sin+p.dir.z*cos;
+  const stride=Math.sin(p.gait),lift=Math.cos(p.gait);
+  const weight=airborne||rolling?0:p.pace;
+  p.rig.rotation.x=blend(p.rig.rotation.x,forward*.13*weight+dodgeForward*.58*p.dodgeLean,rate);
+  p.rig.rotation.z=blend(p.rig.rotation.z,-side*.14*weight-dodgeSide*.88*p.dodgeLean,rate);
+  p.rig.position.y=blend(p.rig.position.y,.055*Math.abs(stride)*weight-.08*p.dodgeLean,rate);
+  p.rig.scale.y=1-.21*p.dodgeLean;
+  for(let i=0;i<2;i++){
+    const leg=p.limbs[i],legSide=i===0?-1:1;
+    const step=stride*legSide;
+    const swing=-step*forward*.64*weight;
+    leg.rotation.x=blend(leg.rotation.x,airborne?-.52:swing-.4*p.dodgeLean,rate);
+    leg.rotation.z=blend(leg.rotation.z,legSide*.06+side*step*.44*weight,rate);
+    p.knees[i].rotation.x=blend(p.knees[i].rotation.x,airborne?.8:Math.max(0,lift*legSide)*.74*weight+.62*p.dodgeLean,rate);
+  }
+  const power=p.networkHuman?Math.min(1,(p.netCharge||0)/1.1):p===controlled?charge:Math.min(1,p.wind/1.1);
+  const left=defend?-1.5:rolling?-.85:-stride*.42*weight;
+  const right=defend?-1.5:p.throwPose>0?-1.55:p.ball?-(.7+power*1.3):rolling?-.85:stride*.42*weight;
+  p.limbs[2].rotation.x=blend(p.limbs[2].rotation.x,left,rate);
+  p.limbs[3].rotation.x=blend(p.limbs[3].rotation.x,right,rate);
+}
+function resetPlayerPose(p){
+  p.visualYaw=p.g.rotation.y;p.pace=p.gait=p.dodgeLean=0;
+  p.rig.rotation.set(0,0,0);p.rig.position.y=0;p.rig.scale.y=1;
+  p.limbs.forEach((limb,i)=>{limb.rotation.x=0;if(i<2)limb.rotation.z=0});
+  p.knees.forEach(knee=>knee.rotation.x=0);
+}
+function copyReplicaPose(p,dt){
+  if(!p.poseTarget)return;
+  const {rotation,limbs,pose}=p.poseTarget,alpha=1-Math.exp(-dt*24);
+  for(let i=0;i<4;i++)p.limbs[i].rotation.x=blend(p.limbs[i].rotation.x,limbs[i],alpha);
+  if(!pose)return;
+  const [yaw,pitch,roll,y,stretch,left,right,leftKnee,rightKnee]=pose;
+  p.visualYaw+=angleDelta(p.visualYaw,yaw)*alpha;
+  p.rig.rotation.y=angleDelta(rotation,p.visualYaw);
+  p.rig.rotation.x=blend(p.rig.rotation.x,pitch,alpha);
+  p.rig.rotation.z=blend(p.rig.rotation.z,roll,alpha);
+  p.rig.position.y=blend(p.rig.position.y,y,alpha);
+  p.rig.scale.y=blend(p.rig.scale.y,stretch,alpha);
+  p.limbs[0].rotation.z=blend(p.limbs[0].rotation.z,left,alpha);
+  p.limbs[1].rotation.z=blend(p.limbs[1].rotation.z,right,alpha);
+  p.knees[0].rotation.x=blend(p.knees[0].rotation.x,leftKnee,alpha);
+  p.knees[1].rotation.x=blend(p.knees[1].rotation.x,rightKnee,alpha);
 }
 function reset(){clearCrowd();clearFire();for(let p of players){scene.remove(p.g);p.g.traverse(o=>{if(o.geometry&&!o.geometry.userData.shared)o.geometry.dispose();if(o===p.marker)o.material.dispose()})}for(let b of balls){scene.remove(b.mesh,b.trail,b.flame);b.flame.geometry.dispose();b.mesh.geometry.dispose();b.trail.geometry.dispose();b.trail.material.dispose()}for(let p of particles){scene.remove(p.m);p.m.geometry.dispose();p.m.material.dispose()}particles=[];players=[];balls=[];for(let t=0;t<teamCount();t++)for(let i=0;i<teamSize;i++)players.push(makePlayer(t,i));controlled=players[humanId()];const ballCount=bajillionMode?teamSize*teamCount()*3:teamSize+teamCount();for(let i=0;i<ballCount;i++){let mesh=sphere(.28,gold);mesh.position.copy(initialBallPosition(i,ballCount));scene.add(mesh);let trail=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineBasicMaterial({color:0xffdc6c,transparent:true,opacity:.7}));scene.add(trail);let flame=new THREE.Mesh(new THREE.ConeGeometry(.38,1,6),fireMaterial);flame.visible=false;scene.add(flame);balls.push({mesh,trail,flame,flaming:false,homingTarget:null,homingTime:0,reflections:0,superShot:false,superOwner:null,shot:0,fireLast:new THREE.Vector3(),pos:initialBallPosition(i,ballCount),vel:new THREE.Vector3(),live:false,thrower:null,holder:null,lock:0})}remaining=120;sudden=false;charge=0;charging=false;round++;sync();$('timer').textContent=infinityMode?'∞':'2:00';$('charge').style.width='0%';$('ballStatus').textContent='WALK OVER A BALL TO PICK UP';$('jumpStatus').textContent='READY';$('dodgeStatus').textContent='READY';$('catchStatus').textContent='READY';$('returnNotice').hidden=true;}
 function sync(){
@@ -625,7 +695,7 @@ function eliminate(p,credit=null) {
   }
   p.g.position.set(p.x,0,p.z);p.g.rotation.y=p.team?-Math.PI/2:Math.PI/2;p.g.scale.setScalar(.85);
   p.marker.position.y=.055;p.marker.visible=true;p.marker.material.color.set(0xffd35d);p.marker.scale.setScalar(1);
-  p.limbs.forEach(limb=>limb.rotation.x=0);
+  resetPlayerPose(p);
   burst(hitPosition,p.team?0xff9981:0x89ffcf);beep(120,.15,'sawtooth');
   if(p===controlled){charging=false;charge=0;holdTime=0;keys={};message('SIDELINED · YOU RETURN IN 5 SECONDS',3)}
   sync();
@@ -695,7 +765,7 @@ let speed=p===controlled||p.networkHuman?7.5:4.7;if(p.ball&&p.wind>0)speed*=.45;
   p.x=oldX+(p.x-oldX)*fraction;p.z=oldZ+(p.z-oldZ)*fraction;
 }else if(stage==='range'){p.x=clamp(p.x,-rangeWidth/2+.6,rangeWidth/2-.6);p.z=clamp(p.z,-rangeLength/2+.6,rangeLength/2-.6);
 }else{p.x=clamp(p.x,-11.3,11.3);p.z=clamp(p.z,p.team?-15.3:.48,p.team?-.48:15.3);}
-resolveObstacles(p);p.g.position.set(p.x,p.jumpY+(p.dash>0?.18:0),p.z);p.marker.position.y=.055-p.jumpY-(p.dash>0?.18:0);let tx=p.networkHuman?p.netAim.x:p===controlled?aim.x:p.target?.x??p.x,tz=p.networkHuman?p.netAim.z:p===controlled?aim.z:p.team?10:-10;p.g.rotation.y=Math.atan2(tx-p.x,tz-p.z);p.marker.visible=p===controlled||p.catchTime>0||p.blockTime>0||p.wind>.1||p.protection>0;p.marker.material.color.set(p.protection>0?0x6de8ff:p.blockTime>0?0x8ccfff:p.catchTime>0?0xffffff:p.throwPlan==='overcharge'&&p.wind>1.1?0xff793d:p.wind>.1?0xffca56:0xb8ffdb);p.marker.scale.setScalar(p.protection>0?1.2+Math.sin(performance.now()*.012)*.15:p.wind>0?1+Math.min(1,p.wind/3):1);p.g.scale.set(1,p.dash>0?.65:1,1);let stride=Math.sin(performance.now()*.014)*Math.min(1,p.move.length())*.45;p.limbs[0].rotation.x=stride;p.limbs[1].rotation.x=-stride;p.limbs[2].rotation.x=p.catchTime>0||p.blockTime>0?-1.5:-stride*.55;p.limbs[3].rotation.x=p.catchTime>0||p.blockTime>0?-1.5:p.throwPose>0?-1.55:p.ball?-(.7+(p.networkHuman?Math.min(1,(p.netCharge||0)/1.1):p===controlled?charge:Math.min(1,p.wind/1.1))*1.3):stride*.55;
+resolveObstacles(p);p.g.position.set(p.x,p.jumpY+(p.dash>0?.18:0),p.z);p.marker.position.y=.055-p.jumpY-(p.dash>0?.18:0);let tx=p.networkHuman?p.netAim.x:p===controlled?aim.x:p.target?.x??p.x,tz=p.networkHuman?p.netAim.z:p===controlled?aim.z:p.team?10:-10;p.g.rotation.y=Math.atan2(tx-p.x,tz-p.z);p.marker.visible=p===controlled||p.catchTime>0||p.blockTime>0||p.wind>.1||p.protection>0;p.marker.material.color.set(p.protection>0?0x6de8ff:p.blockTime>0?0x8ccfff:p.catchTime>0?0xffffff:p.throwPlan==='overcharge'&&p.wind>1.1?0xff793d:p.wind>.1?0xffca56:0xb8ffdb);p.marker.scale.setScalar(p.protection>0?1.2+Math.sin(performance.now()*.012)*.15:p.wind>0?1+Math.min(1,p.wind/3):1);animatePlayer(p,p.x-oldX,p.z-oldZ,dt);
 }
 for (const b of balls) {
   b.lock = Math.max(0, b.lock - dt);
@@ -872,7 +942,7 @@ document.querySelectorAll('.camera-toggle').forEach(b=>b.addEventListener('click
 window.addEventListener('keydown',e=>{if(e.code==='KeyV'&&!e.repeat&&!e.target.closest?.('input,select,textarea')){e.preventDefault();setCameraMode(!firstPerson)}});
 function aimFromView(target){ray.setFromCamera(mouse,camera);if(!ray.ray.intersectPlane(plane,target)||ray.ray.direction.y>=-.015||target.distanceTo(camera.position)>40*courtScale()){target.copy(camera.position).addScaledVector(ray.ray.direction,30);target.y=.9}target.x=clamp(target.x,-12*courtScale(),12*courtScale());target.z=clamp(target.z,-16*courtScale(),16*courtScale());return target}
 function frame(){requestAnimationFrame(frame);let dt=Math.min(clock.getDelta(),.05);accumulator+=dt;while(accumulator>=1/120){if(!networkReplica)update(1/120);accumulator-=1/120}
-if(networkReplica)for(const p of players){if(p.renderTarget)p.g.position.lerp(p.renderTarget,1-Math.exp(-dt*22))}
+if(networkReplica)for(const p of players){if(p.renderTarget)p.g.position.lerp(p.renderTarget,1-Math.exp(-dt*22));copyReplicaPose(p,dt)}
 let active=phase==='playing'||phase==='paused',eyeView=firstPerson&&(active||phase==='over');
 const fov=eyeView?80:52;if(camera.fov!==fov){camera.fov=fov;camera.near=eyeView?.04:.1;camera.updateProjectionMatrix()}
 if(eyeView){const body=controlled.g.position,yaw=viewYaw();camera.position.set(body.x,body.y+1.65,body.z);camera.lookAt(body.x-Math.sin(yaw)*Math.cos(lookPitch),body.y+1.65+Math.sin(lookPitch),body.z-Math.cos(yaw)*Math.cos(lookPitch))}else{let dest=stage==='range'?(active?new THREE.Vector3(controlled.x*.55,18,controlled.z+(controlled.team?-20:20)):new THREE.Vector3(23,24,36)):isCornerCourt()?new THREE.Vector3(0,27,29).multiplyScalar(triangleScale):active?new THREE.Vector3(controlled.alive?controlled.x*.35:0,18,controlled.alive?controlled.z+(controlled.team?-19:19):(controlled.team?-28:28)):new THREE.Vector3(13,21,30);if(cameraWasEye||cameraSnap)camera.position.copy(dest);else camera.position.lerp(dest,1-Math.exp(-dt*3));camera.lookAt(stage==='range'&&active?controlled.x*.78:isCornerCourt()?0:active&&controlled.alive?controlled.x*.2:0,0,isCornerCourt()?0:active&&controlled.alive?controlled.z+(controlled.team?8:-8):0)}
@@ -915,14 +985,16 @@ export const onlineEngine={
  },
  step(dt){update(dt)},
  snapshot(){return {round,stage,teamSize,infinityMode,bajillionMode,phase,remaining,sudden,score:[...score],message:$('message').textContent,fireClock,crowd:{count:crowdReactionCount,team:crowdLastTeam},
-  players:players.map(p=>({...Object.fromEntries(netFields.map(k=>[k,p[k]??0])),team:p.team,id:p.id,ball:balls.indexOf(p.ball),rotation:p.g.rotation.y,scale:p.g.scale.toArray(),limbs:p.limbs.map(l=>l.rotation.x)})),
+  players:players.map(p=>({...Object.fromEntries(netFields.map(k=>[k,p[k]??0])),team:p.team,id:p.id,ball:balls.indexOf(p.ball),rotation:p.g.rotation.y,scale:p.g.scale.toArray(),limbs:p.limbs.map(l=>l.rotation.x),
+   pose:[p.visualYaw,p.rig.rotation.x,p.rig.rotation.z,p.rig.position.y,p.rig.scale.y,
+    p.limbs[0].rotation.z,p.limbs[1].rotation.z,p.knees[0].rotation.x,p.knees[1].rotation.x]})),
   balls:balls.map(b=>({pos:b.pos.toArray(),vel:b.vel.toArray(),live:b.live,flaming:b.flaming,superShot:b.superShot,holder:players.indexOf(b.holder),owner:players.indexOf(b.thrower),homing:players.indexOf(b.homingTarget)})),
   hazards:hazards.map(h=>({x:h.x,z:h.z,life:h.life,team:h.team,super:h.super})),explosions:explosions.map(f=>({id:f.id,x:f.mesh.position.x,z:f.mesh.position.z,life:f.life}))}},
  beginReplica(team,s){if(!networkReplica)networkSettings={stage,teamSize,infinityMode,bajillionMode};teamSize=s.teamSize||1;infinityMode=!!s.infinityMode;bajillionMode=!!s.bajillionMode;switchStage(s.stage);reset();networkReplica=true;networkRound=-1;controlled=players[team];$('overlay').style.display='none';$('pauseScreen').hidden=true;this.apply(s,team)},
  apply(s,team){
   if(networkRound!==s.round){teamSize=s.teamSize||1;infinityMode=!!s.infinityMode;bajillionMode=!!s.bajillionMode;reset();controlled=players[team];networkRound=s.round}
   networkReplica=true;phase=s.phase;remaining=s.remaining;sudden=s.sudden;score=[...s.score];fireClock=s.fireClock;
-  for(let i=0;i<players.length;i++){let p=players[i],v=s.players[i];if(p.alive&&!v.alive)burst(new THREE.Vector3(p.x,1,p.z),p.team?0xff9981:0x89ffcf);for(const k of netFields)p[k]=v[k];p.ball=v.ball<0?null:balls[v.ball];p.g.visible=true;p.g.rotation.y=v.rotation;p.g.scale.fromArray(v.scale);p.renderTarget=new THREE.Vector3(v.x,v.jumpY+(v.dash>0?.18:0),v.z);if(p.g.position.distanceTo(p.renderTarget)>5)p.g.position.copy(p.renderTarget);p.limbs.forEach((l,j)=>l.rotation.x=v.limbs[j]);p.marker.visible=p===controlled||!p.alive||p.protection>0||p.catchTime>0||p.blockTime>0;p.marker.position.y=.055-v.jumpY;p.marker.material.color.set(!p.alive?0xffd35d:p.blockTime>0?0x8ccfff:p.protection>0?0x6de8ff:0xb8ffdb)}
+  for(let i=0;i<players.length;i++){let p=players[i],v=s.players[i];if(p.alive&&!v.alive)burst(new THREE.Vector3(p.x,1,p.z),p.team?0xff9981:0x89ffcf);for(const k of netFields)p[k]=v[k];p.ball=v.ball<0?null:balls[v.ball];p.g.visible=true;p.g.rotation.y=v.rotation;p.g.scale.fromArray(v.scale);p.renderTarget=new THREE.Vector3(v.x,v.jumpY+(v.dash>0?.18:0),v.z);if(p.g.position.distanceTo(p.renderTarget)>5)p.g.position.copy(p.renderTarget);p.poseTarget=v;p.marker.visible=p===controlled||!p.alive||p.protection>0||p.catchTime>0||p.blockTime>0;p.marker.position.y=.055-v.jumpY;p.marker.material.color.set(!p.alive?0xffd35d:p.blockTime>0?0x8ccfff:p.protection>0?0x6de8ff:0xb8ffdb)}
   for(let i=0;i<balls.length;i++){const b=balls[i],v=s.balls[i];b.pos.fromArray(v.pos);b.vel.fromArray(v.vel);b.live=v.live;b.flaming=v.flaming;b.superShot=v.superShot;b.holder=v.holder<0?null:players[v.holder];b.thrower=v.owner<0?null:players[v.owner];b.homingTarget=v.homing<0?null:players[v.homing];b.mesh.position.copy(b.pos);const blue=b.superShot||b.holder?.superArmed;b.mesh.material=b.flaming?(blue?blueFireMaterial:fireMaterial):gold;b.flame.material=blue?blueFireMaterial:fireMaterial;b.flame.visible=b.flaming;b.flame.position.copy(b.pos).add(new THREE.Vector3(0,.5,0));b.trail.visible=b.live;b.trail.material.color.set(blue?0x79f4ff:0xffdc6c);b.trail.geometry.setFromPoints([b.pos,b.pos.clone().addScaledVector(b.vel,-.065)])}
   hazards=s.hazards.map(h=>({...h}));
   for(const f of s.explosions){let fx=explosions.find(e=>e.id===f.id);if(!fx){explodeSuper({superShot:true,superOwner:null,pos:new THREE.Vector3(f.x,.28,f.z)},true);fx=explosions.at(-1);fx.id=f.id}fx.life=f.life}
